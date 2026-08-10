@@ -15,24 +15,23 @@ def get_model():
 model = get_model()
 st.sidebar.title("Chat Setting")
 
-persona = st.sidebar.selectbox(
-    "Choose Which AI do you want:",
-topics = [
+# Replace your current selectbox code around line 18 with this:
+persona_options = [
     "Amazon",
     "Arabic",
     "Astronomy & Space Exploration",
-    "BS in Cloud Computing, AI, Robotic, Cybersecurity and Data Science",
+    "BS in Cloud Computing, AI, Robotics, Cyber Security, and Data Science",
     "Calculus",
     "Chemical Engineering",
-    "Civil Enginneer",
+    "Civil Engineering",
     "Coding",
     "Cooking",
     "Creative Writing",
-    "crimonology",
+    "Criminology",
     "Data Analytics & BI",
     "Digital Marketing & SEO",
     "Electric Engineering",
-    "Electronic Enginneer",
+    "Electronic Engineering",
     "English",
     "Entrepreneurship & Startups",
     "Ethics",
@@ -42,19 +41,19 @@ topics = [
     "French",
     "Game Design & Development",
     "German",
-    "hardware",
+    "Hardware",
     "Hindi",
     "Indonesia",
     "Linear Algebra",
     "Maths",
-    "Medical Patience",
+    "Medical Patients",
     "Mental Health & Mindfulness",
     "Motivation",
     "Music Theory & Production",
     "News of war and other good things",
     "Nutrition & Dietetics",
     "Persian",
-    "Petrolium",
+    "Petroleum",
     "Photography & Videography",
     "Physics",
     "Portuguese",
@@ -63,17 +62,20 @@ topics = [
     "Research",
     "Roman Urdu (Urdu written in English letters)",
     "Russian",
-    "Software enginnering",
+    "Software engineering",
     "Spanish",
-    "Statistic",
+    "Statistics",
     "Turkish",
     "UI/UX Product Design",
     "Urdu",
     "World History & Archaeology"
+]
 
-
-    ]
+persona = st.sidebar.selectbox(
+    label="Choose Which AI do you want:",
+    options=persona_options
 )
+
 hide_streamlit_badge = """ 
 <style> 
 #MainMenu {visibility: hidden;}
