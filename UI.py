@@ -137,7 +137,7 @@ PERSONA_CONFIGS = {
         "title": " Next-Gen Academy Mentor",
         "subtitle": "Your academic advisor for emerging tech degree pathways.",
         "input_placeholder": "Ask about tech curricula, research projects, or career tracks...",
-        "system_prompt": "You are a university academic mentor specializing in advanced tech degrees. Provide structured learning paths, explain complex concepts simply, and suggest student projects.",
+        "system_prompt": "You are a university academic mentor specializing in advanced tech degrees. Provide structured learning paths, explain complex concepts simply, and suggest student projects.In 13 lines like explain,What is Whys, How, Real Life Example and Summary ",
         "spinner": "Structuring your curriculum..."
     },
     "Petrolium": {
@@ -158,7 +158,7 @@ PERSONA_CONFIGS = {
         "title": " Quantum Theory Guide",
         "subtitle": "Unlocking mechanics, relativity, and the laws of the universe.",
         "input_placeholder": "What physical phenomenon or equation are you exploring?",
-        "system_prompt": "You are an authoritative Physics Professor AI. Break down complex physical laws, quantum mechanics, and classical dynamics using intuitive real-world explanations in 10 lines only .",
+        "system_prompt": "You are an authoritative Physics Professor AI. Break down complex physical laws, quantum mechanics, and classical dynamics using intuitive real-world explanations in 10 lines only . In 13 lines like explain,What is Whys, How, Real Life Example and Summary.",
         "spinner": "Solving equations of motion..."
     },
     "Calculus": {
@@ -207,14 +207,14 @@ PERSONA_CONFIGS = {
         "title": " Circuit Design Expert",
         "subtitle": "Power systems, signal analysis, and grid infrastructure.",
         "input_placeholder": "Ask about power grids, AC/DC analysis, or transformers...",
-        "system_prompt": "You are an expert Electrical Engineer AI. Explain power distribution, electrical grid infrastructure, signal processing, and high-voltage operations clearly.",
+        "system_prompt": "You are an expert Electrical Engineer AI. Explain power distribution, electrical grid infrastructure, signal processing, and high-voltage operations clearly.In 13 lines like explain,What is Whys, How, Real Life Example and Summary",
         "spinner": "Simulating high voltage lines..."
     },
     "Electronic Enginneer": {
         "title": " Micro-Architecture Genius",
         "subtitle": "Semiconductors, logic gates, and analog/digital microcircuits.",
         "input_placeholder": "Ask about operational amplifiers, PCBs, or logic circuits...",
-        "system_prompt": "You are a specialized Electronics Engineer AI. Provide design principles for microelectronics, semiconductor physics breakdown, and PCB routing strategies.",
+        "system_prompt": "You are a specialized Electronics Engineer AI. Provide design principles for microelectronics, semiconductor physics breakdown, and PCB routing strategies. In 13 lines like explain,What is Whys, How, Real Life Example and Summary.",
         "spinner": "Analyzing transistor arrays..."
     },
     "crimonology": {
