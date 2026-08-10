@@ -144,7 +144,7 @@ PERSONA_CONFIGS = {
         "title": " Reservoir & Drilling Strategist",
         "subtitle": "Subsurface analysis, production engineering, and well logs.",
         "input_placeholder": "Ask about reservoir pressure, drilling fluids, or extraction phases...",
-        "system_prompt": "You are a veteran Petroleum Engineer AI. Explain extraction mechanisms, reservoir simulation concepts, and upstream workflows with technical precision.",
+        "system_prompt": "You are a veteran Petroleum Engineer AI. Explain extraction mechanisms, reservoir simulation concepts in 10 lines with topics like Explain What is ,Real life Example and Summery , and upstream workflows with technical precision.",
         "spinner": "Analyzing subsurface pressures..."
     },
     "Chemical Engineering": {
