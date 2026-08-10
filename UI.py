@@ -176,12 +176,97 @@ PERSONA_CONFIGS = {
         "spinner": "Evaluating numerical values..."
     },
     "English": {
-        "title": " Syntax & Prose Expert",
+        "title": "Syntax & Prose Expert",
         "subtitle": "Grammar correction, creative writing, and essay analysis.",
         "input_placeholder": "Paste text to edit, or describe an essay prompt...",
         "system_prompt": "You are an expert English Professor and Editor AI. Refine vocabulary, correct grammatical syntax, analyze literary devices, and suggest structural essay updates.",
         "spinner": "Polishing your grammar..."
     },
+    "Urdu": {
+        "title": "فصاحت و بلاغت کے ماہر",
+        "subtitle": "گرامر کی درستی، تخلیقی تحریر، اور مضمون کا تجزیہ۔",
+        "input_placeholder": "ترمیم کے لیے متن یہاں پیسٹ کریں، یا مضمون کا عنوان لکھیں...",
+        "system_prompt": "آپ ایک ماہر ادیب، پروفیسر اور ایڈیٹر AI ہیں۔ الفاظ کا انتخاب بہتر بنائیں، گرامر اور جملوں کی ساخت درست کریں، اور ادبی محاسن کا تجزیہ کریں۔",
+        "spinner": "آپ کی تحریر کو خوبصورت بنایا جا رہا ہے..."
+    },
+    "Roman Urdu (Urdu written in English letters)": {
+        "title": "Alfaaz aur Navishta Expert",
+        "subtitle": "Grammar ki darusti, creative writing, aur essay ka tajiya.",
+        "input_placeholder": "Text yahan paste karein edit karne ke liye, ya essay ka topic likhein...",
+        "system_prompt": "Aap ek expert Urdu Professor aur Editor AI hain jo Roman script samajhte hain. Vocabulary behtar karein, urdu grammar aur jumlun ki saakhth (syntax) thik karein, aur behtareen suggestions dein.",
+        "spinner": "Aapki likhai ko polished kiya ja raha hai..."
+    },
+    "Arabic": {
+        "title": "خبير البلاغة والتدقيق اللغوي",
+        "subtitle": "تصحيح القواعد، الكتابة الإبداعية، وتحليل النصوص والمقالات.",
+        "input_placeholder": "أصق النص المراد تعديله، أو اكتب موضوع المقال هنا...",
+        "system_prompt": "أنت بروفيسور لغة عربية ومحرر ذكاء اصطناعي خبير. قم بتحسين المفردات، وتصحيح التراكيب النحوية والإملائية، وتحليل الأساليب البلاغية والجمالية.",
+        "spinner": "جاري تدقيق وتحسين النص لغوياً..."
+    },
+    "Spanish": {
+        "title": "Experto en Sintaxis y Prosa",
+        "subtitle": "Corrección gramatical, escritura creativa y análisis de ensayos.",
+        "input_placeholder": "Pegue el texto a editar o describa el tema del ensayo...",
+        "system_prompt": "Eres un experto Profesor de Literatura y Editor de IA. Refina el vocabulario, corrige la sintaxis gramatical, analiza figuras literarias y sugiere mejoras estructurales.",
+        "spinner": "Perfeccionando tu gramática..."
+    },
+    "French": {
+        "title": "Expert en Syntaxe & Prose",
+        "subtitle": "Correction grammaticale, écriture créative et analyse de dissertations.",
+        "input_placeholder": "Collez le texte à éditer ou décrivez le sujet de la dissertation...",
+        "system_prompt": "Vous êtes un professeur de lettres de haut niveau et un éditeur IA. Enrichissez le vocabulaire, corrigez la syntaxe, analysez les figures de style et proposez des révisions structurelles.",
+        "spinner": "Correction et polissage de votre texte..."
+    },
+    "Hindi": {
+        "title": "व्याकरण और गद्य विशेषज्ञ",
+        "subtitle": "व्याकरण सुधार, रचनात्मक लेखन और निबंध विश्लेषण।",
+        "input_placeholder": "संपादित करने के लिए पाठ यहाँ पेस्ट करें, या निबंध का विषय लिखें...",
+        "system_prompt": "आप एक विशेषज्ञ हिंदी प्रोफेसर और संपादक एआई हैं। शब्दावली को परिष्कृत करें, व्याकरण संबंधी वाक्य विन्यास को सही करें और संरचनात्मक सुधारों का सुझाव दें।",
+        "spinner": "आपके व्याकरण को सुधारा जा रहा है..."
+    },
+    "German": {
+        "title": "Experte für Syntax & Stilistik",
+        "subtitle": "Grammatikkorrektur, kreatives Schreiben und Essay-Analyse.",
+        "input_placeholder": "Fügen Sie hier den Text ein oder beschreiben Sie das Essay-Thema...",
+        "system_prompt": "Sie sind ein erfahrener Professor und KI-Lektor. Verfeinern Sie den Wortschatz, korrigieren Sie die Grammatik, analysieren Sie stilistische Mittel und optimieren Sie den Textaufbau.",
+        "spinner": "Grammatik und Stil werden poliert..."
+    },
+    "Portuguese": {
+        "title": "Especialista em Sintaxe e Prosa",
+        "subtitle": "Correção gramatical, escrita criativa e análise de redações.",
+        "input_placeholder": "Cole o texto para editar ou descreva o tema da redação...",
+        "system_prompt": "Você é um professor experiente e editor de IA. Refine o vocabulário, corrija a sintaxe gramatical, analise recursos literários e sugira melhorias estruturais.",
+        "spinner": "Aprimorando sua gramática..."
+    },
+    "Turkish": {
+        "title": "Sözdizimi ve Nesir Uzmanı",
+        "subtitle": "Dilbilgisi düzeltme, yaratıcı yazarlık ve kompozisyon analizi.",
+        "input_placeholder": "Düzenlemek istediğiniz metni yapıştırın veya konuyu açıklayın...",
+        "system_prompt": "Siz uzman bir Edebiyat Profesörü ve Yapay Zekâ Editörüsünüz. Kelime dağarcığını geliştirin, dilbilgisi hatalarını düzeltin ve yapısal düzenlemeler önerin.",
+        "spinner": "Dilbilgisi kontrol ediliyor ve düzenleniyor..."
+    },
+    "Indonesia": {
+        "title": "Pakar Sintaksis & Prosa",
+        "subtitle": "Koreksi tata bahasa, penulisan kreatif, dan analisis esai.",
+        "input_placeholder": "Tempel teks yang ingin diedit, oder jelaskan topik esai...",
+        "system_prompt": "Anda adalah Profesor Bahasa dan Editor AI ahli. Sempurnakan kosakata, perbaiki sintaksis tata bahasa, analisis perangkat sastra, dan berikan saran struktural esai.",
+        "spinner": "Memperbaiki tata bahasa Anda..."
+    },
+    "Russian": {
+        "title": "Эксперт по Синтаксису и Прозе",
+        "subtitle": "Исправление грамматики, творческое письмо и анализ эссе.",
+        "input_placeholder": "Вставьте текст для редактирования или опишите тему эссе...",
+        "system_prompt": "Вы — опытный профессор филологии и ИИ-редактор. Обогащайте словарный запас, исправляйте грамматику и синтаксис, анализируйте стилистические приемы.",
+        "spinner": "Исправление грамматики и стиля..."
+    },
+    "Persian": {
+        "title": "استاد نگارش و ویرایش متن",
+        "subtitle": "تصحیح گرامر و ویراستاری، نویسندگی خلاق و تحلیل مقالات.",
+        "input_placeholder": "متن خود را برای ویرایش اینجا بچسبانید یا موضوع مقاله را توصیف کنید...",
+        "system_prompt": "شما یک استاد مجرب ادبیات و هوش مصنوعی ویراستار هستید. واژگان را ارتقا دهید، ساختار جملات را اصلاح کنید و تحلیل‌های ساختاری ارائه دهید.",
+        "spinner": "در حال ویرایش و صیقل دادن به متن شما..."
+    },
+    
     "Ethics": {
         "title": " Philosophical Arbitrator",
         "subtitle": "Analyzing moral theories, logic frameworks, and dilemmas.",
