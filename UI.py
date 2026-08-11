@@ -3,19 +3,24 @@ import streamlit as st
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_mistralai import ChatMistralAI
 
+# ---------------------------------------------------------------------------
 # UI basics
+# ---------------------------------------------------------------------------
 st.set_page_config(page_title="Multi-personal AI Chatbot", layout="centered")
-st.image("Image.png", width=150)
 
-# Load Mistral API key from environment or Streamlit secrets (do NOT hardcode keys in source)
+if os.path.exists("Image.png"):
+    st.image("Image.png", width=150)
 
+# Mistral API key
 os.environ["MISTRAL_API_KEY"] = "EpgVFLlyQVkXWFmHv0lDwsMlZymmDoGP"
+
 
 # Model factory (cached)
 @st.cache_resource
 def get_model():
     # adjust model name / temperature if needed
     return ChatMistralAI(model="mistral-small-2506", temperature=0.9)
+
 
 model = get_model()
 
@@ -73,80 +78,103 @@ persona_options = [
     "Turkish",
     "UI/UX Product Design",
     "Urdu",
-    "World History & Archaeology"
+    "World History & Archaeology",
 ]
 
 persona = st.sidebar.selectbox(
     label="Choose Which AI do you want:",
-    options=persona_options
+    options=persona_options,
 )
-
 
 st.sidebar.markdown("---")
 st.sidebar.title("Paper / Document")
 
 uploaded_file = st.sidebar.file_uploader(
     "Upload a text document or paper context:",
-    type=["txt", "pdf", "py", "csv", "json"]
+    type=["txt", "pdf", "py", "csv", "json"],
 )
+
+MAX_DOC_CHARS = 20_000  # keep the system prompt from ballooning / blowing the context window
+
+
+def extract_pdf_text(raw_bytes: bytes) -> str:
+    """Extract text from a PDF's raw bytes using pypdf."""
+    import io
+    from pypdf import PdfReader
+
+    reader = PdfReader(io.BytesIO(raw_bytes))
+    pages = [page.extract_text() or "" for page in reader.pages]
+    return "\n".join(pages)
+
 
 document_context = ""
 if uploaded_file is not None:
     try:
-        # For simple text-like files, try decoding as utf-8
         raw = uploaded_file.getvalue()
-        try:
-            string = raw.decode("utf-8")
-        except Exception:
-            # If decoding fails, fall back to a simple representation
-            string = str(raw)
-        document_context = string
-        st.sidebar.success(f'Loaded: {uploaded_file.name} ({len(document_context)} characters)')
+
+        if uploaded_file.name.lower().endswith(".pdf"):
+            document_context = extract_pdf_text(raw)
+        else:
+            # Text-like files: txt, py, csv, json
+            try:
+                document_context = raw.decode("utf-8")
+            except UnicodeDecodeError:
+                document_context = raw.decode("utf-8", errors="replace")
+
+        if len(document_context) > MAX_DOC_CHARS:
+            document_context = (
+                document_context[:MAX_DOC_CHARS]
+                + f"\n\n[... truncated, {len(document_context) - MAX_DOC_CHARS} more characters omitted ...]"
+            )
+
+        st.sidebar.success(f"Loaded: {uploaded_file.name} ({len(document_context)} characters)")
     except Exception as e:
         st.sidebar.error("Error reading file: " + str(e))
 
-# Predefined persona configs (you can extend this dict as needed)
+# Predefined persona configs (extend this dict as needed)
 PERSONA_CONFIGS = {
     "Motivation": {
         "title": "Mindset Master AI",
         "subtitle": "Your 24/7 personal pocket cheerleader.",
         "input_placeholder": "What goal are you tackling today?",
         "system_prompt": "You are an enthusiastic, high-energy Motivational AI agent. Boost user confidence, combat self-doubt, and give actionable productivity advice.",
-        "spinner": "Channeling pure motivation..."
+        "spinner": "Channeling pure motivation...",
     },
     "Cooking": {
         "title": "Chef de Partie AI",
         "subtitle": "Your culinary guide, recipe creator, and kitchen assistant.",
         "input_placeholder": "What ingredients do you have, or what do you want to cook?",
         "system_prompt": "You are an expert culinary chef AI. Provide clear recipes, cooking techniques, ingredient substitutions, and kitchen tips.",
-        "spinner": "Sharpening the knives..."
+        "spinner": "Sharpening the knives...",
     },
     "Coding": {
         "title": "StackOverflow Companion",
         "subtitle": "Your expert software engineer and debugger.",
         "input_placeholder": "Paste your code error or ask a programming question...",
         "system_prompt": "You are an expert senior software engineer AI. Provide clean, secure, optimized code snippets and explain logic clearly.",
-        "spinner": "Compiling thoughts..."
+        "spinner": "Compiling thoughts...",
     },
     "Amazon": {
         "title": "Marketplace Navigator",
         "subtitle": "Your expert advisor for Amazon AWS, FBA, and e-commerce growth.",
         "input_placeholder": "Ask about AWS architecture, FBA listing optimization, or SEO...",
         "system_prompt": "You are an Amazon ecosystem expert AI. Offer clear, step-by-step guidance on AWS cloud infrastructure and Amazon Seller strategies.",
-        "spinner": "Optimizing listings and servers..."
+        "spinner": "Optimizing listings and servers...",
     },
     # add other specific configs as you prefer...
 }
 
-# Simple fallback generator for any persona not in PERSONA_CONFIGS
-def make_default_config(name: str):
+
+def make_default_config(name: str) -> dict:
+    """Fallback config generator for any persona not in PERSONA_CONFIGS."""
     return {
         "title": f"{name} Assistant",
         "subtitle": f"A helpful {name} assistant.",
         "input_placeholder": f"Ask the {name} assistant something...",
         "system_prompt": f"You are a helpful and knowledgeable assistant specialized in: {name}. Provide accurate and concise answers.",
-        "spinner": "Thinking..."
+        "spinner": "Thinking...",
     }
+
 
 current_config = PERSONA_CONFIGS.get(persona, make_default_config(persona))
 
@@ -159,14 +187,19 @@ if document_context:
         + "\n[END OF CONTEXT DOCUMENT]\n"
     )
 
-# Initialize session state
-if "current_persona" not in st.session_state or st.session_state.current_persona != persona or \
-   "last_doc_name" not in st.session_state or st.session_state.last_doc_name != (uploaded_file.name if uploaded_file else None):
+# Initialize / reset session state when persona or uploaded doc changes
+current_doc_name = uploaded_file.name if uploaded_file else None
+needs_reset = (
+    "current_persona" not in st.session_state
+    or st.session_state.current_persona != persona
+    or "last_doc_name" not in st.session_state
+    or st.session_state.last_doc_name != current_doc_name
+)
+
+if needs_reset:
     st.session_state.current_persona = persona
-    st.session_state.last_doc_name = uploaded_file.name if uploaded_file else None
-    st.session_state.messages = [
-        SystemMessage(content=final_system_prompt)
-    ]
+    st.session_state.last_doc_name = current_doc_name
+    st.session_state.messages = [SystemMessage(content=final_system_prompt)]
 
 st.title(current_config["title"])
 st.subheader(current_config["subtitle"])
@@ -182,22 +215,18 @@ for msg in st.session_state.messages:
     elif isinstance(msg, AIMessage):
         with st.chat_message("assistant"):
             st.write(msg.content)
-    elif isinstance(msg, SystemMessage):
-        # Optionally show system message in a small caption (or skip)
-        pass
+    # SystemMessage is intentionally not rendered in the chat UI
 
 # Chat input
 if user_input := st.chat_input(current_config["input_placeholder"]):
     with st.chat_message("user"):
         st.write(user_input)
-        st.session_state.messages.append(HumanMessage(content=user_input))
+    st.session_state.messages.append(HumanMessage(content=user_input))
 
     with st.chat_message("assistant"):
         with st.spinner(current_config.get("spinner", "Thinking...")):
             try:
-                # model.invoke may expect a list of messages in the langchain message objects format
                 response = model.invoke(st.session_state.messages)
-                # response handling: try to read .content (langchain-like) else str(response)
                 content = getattr(response, "content", None) or str(response)
                 st.write(content)
                 st.session_state.messages.append(AIMessage(content=content))
