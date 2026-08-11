@@ -154,7 +154,12 @@ PERSONA_CONFIGS = {
         "title": "StackOverflow Companion",
         "subtitle": "Your expert software engineer and debugger.",
         "input_placeholder": "Paste your code error or ask a programming question...",
-        "system_prompt": "You are an expert senior software engineer AI. Provide clean, secure, optimized code snippets and explain logic clearly.",
+        "system_prompt": (
+            "You are an expert senior software engineer AI. Provide clean, secure, "
+            "optimized code. Always put full code in a fenced code block with the "
+            "correct language tag (e.g. ```python ... ```), and explain the logic "
+            "clearly outside the code block."
+        ),
         "spinner": "Compiling thoughts...",
     },
     "Amazon": {
@@ -193,33 +198,61 @@ def make_default_config(name: str) -> dict:
     }
 
 
-def extract_html(text: str) -> str | None:
-    """Pull a full HTML document out of an assistant reply, if present.
+def extract_code_blocks(text: str) -> list[tuple[str, str]]:
+    """Find all fenced code blocks in an assistant reply.
 
-    Looks first for a ```html ... ``` fenced code block, then falls back to
-    a raw <html> ... </html> section. Returns None if no HTML is found.
+    Returns a list of (language, code) tuples, e.g. [("python", "print(1)")].
+    Language is lowercased; defaults to "txt" if the fence has no language tag.
+    Also catches a raw <html>...</html> section with no fence, tagged as "html".
     """
-    fenced = re.search(r"```html\s*(.*?)```", text, re.DOTALL | re.IGNORECASE)
-    if fenced:
-        return fenced.group(1).strip()
+    blocks = []
+    for match in re.finditer(r"```(\w+)?\s*\n?(.*?)```", text, re.DOTALL):
+        lang = (match.group(1) or "txt").strip().lower()
+        code = match.group(2).strip()
+        if code:
+            blocks.append((lang, code))
 
-    raw = re.search(r"(<html.*?</html>)", text, re.DOTALL | re.IGNORECASE)
-    if raw:
-        return raw.group(1).strip()
+    if not any(lang == "html" for lang, _ in blocks):
+        raw = re.search(r"(<html.*?</html>)", text, re.DOTALL | re.IGNORECASE)
+        if raw:
+            blocks.append(("html", raw.group(1).strip()))
 
-    return None
+    return blocks
 
 
-def render_html_tools(html_code: str, key_suffix: str) -> None:
-    """Show a live preview + download button for a chunk of generated HTML."""
-    with st.expander("🌐 Preview generated page", expanded=True):
-        components.html(html_code, height=500, scrolling=True)
+# Map a fenced code block's language tag to a file extension + download mime type
+LANG_TO_FILE = {
+    "python": (".py", "text/x-python"),
+    "py": (".py", "text/x-python"),
+    "html": (".html", "text/html"),
+    "css": (".css", "text/css"),
+    "javascript": (".js", "application/javascript"),
+    "js": (".js", "application/javascript"),
+    "json": (".json", "application/json"),
+    "sql": (".sql", "text/plain"),
+    "bash": (".sh", "text/x-sh"),
+    "sh": (".sh", "text/x-sh"),
+    "yaml": (".yaml", "text/yaml"),
+    "yml": (".yaml", "text/yaml"),
+    "txt": (".txt", "text/plain"),
+}
+
+
+def render_code_tools(lang: str, code: str, key_suffix: str) -> None:
+    """Show a live HTML preview (if applicable) and a download button for a code block."""
+    ext, mime = LANG_TO_FILE.get(lang, (".txt", "text/plain"))
+    file_name = f"generated{ext}"
+
+    if lang == "html":
+        with st.expander("🌐 Preview generated page", expanded=True):
+            components.html(code, height=500, scrolling=True)
+
     st.download_button(
-        label="⬇️ Download .html",
-        data=html_code,
-        file_name="generated_page.html",
-        mime="text/html",
-        key=f"download_{key_suffix}",
+        label=f"⬇️ Download {file_name}",
+        data=code,
+        file_name=file_name,
+        mime=mime,
+        key=f"download_{key_suffix}_{lang}",
     )
 
 
@@ -262,9 +295,8 @@ for idx, msg in enumerate(st.session_state.messages):
     elif isinstance(msg, AIMessage):
         with st.chat_message("assistant"):
             st.write(msg.content)
-            html_code = extract_html(msg.content)
-            if html_code:
-                render_html_tools(html_code, key_suffix=f"history_{idx}")
+            for block_idx, (lang, code) in enumerate(extract_code_blocks(msg.content)):
+                render_code_tools(lang, code, key_suffix=f"history_{idx}_{block_idx}")
     # SystemMessage is intentionally not rendered in the chat UI
 
 # Chat input
@@ -281,8 +313,7 @@ if user_input := st.chat_input(current_config["input_placeholder"]):
                 st.write(content)
                 st.session_state.messages.append(AIMessage(content=content))
 
-                html_code = extract_html(content)
-                if html_code:
-                    render_html_tools(html_code, key_suffix="latest")
+                for block_idx, (lang, code) in enumerate(extract_code_blocks(content)):
+                    render_code_tools(lang, code, key_suffix=f"latest_{block_idx}")
             except Exception as e:
                 st.error("Failed to fetch response: " + str(e))
