@@ -1,5 +1,7 @@
 import os
+import re
 import streamlit as st
+import streamlit.components.v1 as components
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_mistralai import ChatMistralAI
 
@@ -29,6 +31,7 @@ st.sidebar.title("Chat Setting")
 persona_options = [
     "Amazon",
     "Arabic",
+    "Web Design (HTML/CSS)",
     "Astronomy & Space Exploration",
     "BS in Cloud Computing, AI, Robotics, Cyber Security, and Data Science",
     "Calculus",
@@ -160,6 +163,20 @@ PERSONA_CONFIGS = {
         "input_placeholder": "Ask about AWS architecture, FBA listing optimization, or SEO...",
         "system_prompt": "You are an Amazon ecosystem expert AI. Offer clear, step-by-step guidance on AWS cloud infrastructure and Amazon Seller strategies.",
         "spinner": "Optimizing listings and servers...",
+    },
+    "Web Design (HTML/CSS)": {
+        "title": "Web Design Studio AI",
+        "subtitle": "Describe a page and get ready-to-use HTML/CSS.",
+        "input_placeholder": "Describe the web page or component you want (e.g. 'a pricing page with 3 tiers')...",
+        "system_prompt": (
+            "You are an expert front-end web designer AI. When the user asks for a page, "
+            "component, or layout, respond with a SINGLE complete, self-contained HTML "
+            "document (including inline <style> CSS, and inline <script> JS if needed) "
+            "inside one ```html code block. Use modern, clean design. Do not split the "
+            "code across multiple blocks. After the code block you may add a short plain-"
+            "text explanation of the design choices."
+        ),
+        "spinner": "Sketching the layout...",
     },
     # add other specific configs as you prefer...
 }
