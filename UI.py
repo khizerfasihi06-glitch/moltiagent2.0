@@ -193,6 +193,36 @@ def make_default_config(name: str) -> dict:
     }
 
 
+def extract_html(text: str) -> str | None:
+    """Pull a full HTML document out of an assistant reply, if present.
+
+    Looks first for a ```html ... ``` fenced code block, then falls back to
+    a raw <html> ... </html> section. Returns None if no HTML is found.
+    """
+    fenced = re.search(r"```html\s*(.*?)```", text, re.DOTALL | re.IGNORECASE)
+    if fenced:
+        return fenced.group(1).strip()
+
+    raw = re.search(r"(<html.*?</html>)", text, re.DOTALL | re.IGNORECASE)
+    if raw:
+        return raw.group(1).strip()
+
+    return None
+
+
+def render_html_tools(html_code: str, key_suffix: str) -> None:
+    """Show a live preview + download button for a chunk of generated HTML."""
+    with st.expander("🌐 Preview generated page", expanded=True):
+        components.html(html_code, height=500, scrolling=True)
+    st.download_button(
+        label="⬇️ Download .html",
+        data=html_code,
+        file_name="generated_page.html",
+        mime="text/html",
+        key=f"download_{key_suffix}",
+    )
+
+
 current_config = PERSONA_CONFIGS.get(persona, make_default_config(persona))
 
 # Build final system prompt including uploaded document context if present
@@ -225,13 +255,16 @@ if st.sidebar.button("Clear Chat History"):
     st.session_state.messages = [SystemMessage(content=final_system_prompt)]
 
 # Render chat history
-for msg in st.session_state.messages:
+for idx, msg in enumerate(st.session_state.messages):
     if isinstance(msg, HumanMessage):
         with st.chat_message("user"):
             st.write(msg.content)
     elif isinstance(msg, AIMessage):
         with st.chat_message("assistant"):
             st.write(msg.content)
+            html_code = extract_html(msg.content)
+            if html_code:
+                render_html_tools(html_code, key_suffix=f"history_{idx}")
     # SystemMessage is intentionally not rendered in the chat UI
 
 # Chat input
@@ -247,5 +280,9 @@ if user_input := st.chat_input(current_config["input_placeholder"]):
                 content = getattr(response, "content", None) or str(response)
                 st.write(content)
                 st.session_state.messages.append(AIMessage(content=content))
+
+                html_code = extract_html(content)
+                if html_code:
+                    render_html_tools(html_code, key_suffix="latest")
             except Exception as e:
                 st.error("Failed to fetch response: " + str(e))
