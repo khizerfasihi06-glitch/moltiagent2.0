@@ -248,7 +248,7 @@ def render_code_tools(lang: str, code: str, key_suffix: str) -> None:
             components.html(code, height=500, scrolling=True)
 
     st.download_button(
-        label=f"⬇️ Download {file_name}",
+        label=f" Download {file_name}",
         data=code,
         file_name=file_name,
         mime=mime,
