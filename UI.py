@@ -81,17 +81,6 @@ persona = st.sidebar.selectbox(
     options=persona_options
 )
 
-# Hide Streamlit branding (optional)
-hide_streamlit_badge = """
-<style>
-#MainMenu {visibility: hidden;}
-footer {visibility: hidden;}
-header {visibility: hidden;}
-.stDeployButton {display:none;}
-div[data-testid="stStatusWidget"] {visibility: hidden;}
-</style>
-"""
-st.markdown(hide_streamlit_badge, unsafe_allow_html=True)
 
 st.sidebar.markdown("---")
 st.sidebar.title("Paper / Document")
