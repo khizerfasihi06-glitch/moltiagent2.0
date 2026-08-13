@@ -114,20 +114,12 @@ MAX_DOC_CHARS = 20_000  # keep the system prompt from ballooning / blowing the c
 
 
 def extract_pdf_text(raw_bytes: bytes) -> str:
-    """Extract text from a PDF's raw bytes using LangChain's PyPDFLoader."""
-    import tempfile
-    from langchain_community.document_loaders import PyPDFLoader
+    """Extract text from a PDF's raw bytes using pdfplumber."""
+    import pdfplumber
 
-    with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
-        tmp.write(raw_bytes)
-        tmp_path = tmp.name
-
-    try:
-        loader = PyPDFLoader(tmp_path)
-        docs = loader.load()
-        return "\n".join(doc.page_content for doc in docs)
-    finally:
-        os.remove(tmp_path)
+    with pdfplumber.open(io.BytesIO(raw_bytes)) as pdf:
+        pages = [page.extract_text() or "" for page in pdf.pages]
+    return "\n".join(pages)
 
 
 document_context = ""
@@ -322,7 +314,7 @@ def render_code_tools(lang: str, code: str, key_suffix: str) -> None:
     file_name = f"generated{ext}"
 
     if lang == "html":
-        with st.expander("🌐 Preview generated page", expanded=True):
+        with st.expander("Preview generated page", expanded=True):
             components.html(code, height=500, scrolling=True)
 
     col1, col2 = st.columns(2)
