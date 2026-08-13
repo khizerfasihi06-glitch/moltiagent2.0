@@ -21,7 +21,7 @@ if os.path.exists("Image.png"):
 # and it'll be picked up automatically below.
 if "MISTRAL_API_KEY" not in os.environ:
     try:
-        os.environ["MISTRAL_API_KEY"] = st.secrets["MISTRAL_API_KEY"]
+        os.environ["MISTRAL_API_KEY"] = "fE2OLrga4hpKHkGXCn8n5Ck35wCwIq0L"
     except Exception:
         st.error(
             "MISTRAL_API_KEY is not set. Add it to your environment or "
@@ -272,35 +272,50 @@ LANG_TO_FILE = {
 # ---------------------------------------------------------------------------
 def generate_pdf_bytes(text: str, title: str | None = None, monospace: bool = False) -> bytes:
     """Render plain text (chat reply or code block) into a downloadable PDF and
-    return the raw bytes, using wkhtmltopdf (via pdfkit) -- no Python PDF
-    generation library required.
+    return the raw bytes, using matplotlib's built-in PDF backend -- no
+    external PDF library or binary required.
     """
-    import pdfkit
-    from xml.sax.saxutils import escape
+    import textwrap
+    from matplotlib.backends.backend_pdf import PdfPages
+    import matplotlib.pyplot as plt
 
-    body_font = "'Courier New', monospace" if monospace else "Arial, sans-serif"
-    safe_text = escape(text)
-    heading_html = f"<h1>{escape(title)}</h1>" if title else ""
+    page_width, page_height = 8.27, 11.69  # A4 inches
+    font_family = "monospace" if monospace else "sans-serif"
+    font_size = 8 if monospace else 10
+    chars_per_line = 100 if monospace else 90
+    lines_per_page = 60
 
-    html = f"""
-    <html>
-      <head>
-        <meta charset="utf-8">
-        <style>
-          body {{ font-family: {body_font}; font-size: 12px; white-space: pre-wrap;
-                  word-wrap: break-word; margin: 40px; }}
-          h1 {{ font-family: Arial, sans-serif; font-size: 20px; }}
-        </style>
-      </head>
-      <body>
-        {heading_html}
-        <div>{safe_text}</div>
-      </body>
-    </html>
-    """
+    # Wrap text into fixed-width lines, preserving existing newlines.
+    wrapped_lines: list[str] = []
+    for raw_line in text.split("\n"):
+        if raw_line.strip() == "":
+            wrapped_lines.append("")
+            continue
+        wrapped_lines.extend(
+            textwrap.wrap(raw_line, width=chars_per_line, break_long_words=True)
+            or [""]
+        )
 
-    options = {"quiet": ""}
-    return pdfkit.from_string(html, False, options=options)
+    buffer = io.BytesIO()
+    with PdfPages(buffer) as pdf:
+        page_lines = wrapped_lines
+        first_page = True
+        while page_lines or first_page:
+            chunk, page_lines = page_lines[:lines_per_page], page_lines[lines_per_page:]
+            fig = plt.figure(figsize=(page_width, page_height))
+            fig.patch.set_visible(False)
+            y = 0.97
+            if first_page and title:
+                fig.text(0.07, y, title, fontsize=14, fontweight="bold", family="sans-serif")
+                y -= 0.05
+            for line in chunk:
+                fig.text(0.07, y, line, fontsize=font_size, family=font_family, va="top")
+                y -= 0.016
+            pdf.savefig(fig)
+            plt.close(fig)
+            first_page = False
+
+    return buffer.getvalue()
 
 
 def render_code_tools(lang: str, code: str, key_suffix: str) -> None:
