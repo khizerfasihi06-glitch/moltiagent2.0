@@ -114,12 +114,29 @@ MAX_DOC_CHARS = 20_000  # keep the system prompt from ballooning / blowing the c
 
 
 def extract_pdf_text(raw_bytes: bytes) -> str:
-    """Extract text from a PDF's raw bytes using pdfplumber."""
-    import pdfplumber
+    """Extract text from a PDF's raw bytes using the poppler-utils `pdftotext`
+    command-line tool (no Python PDF library required)."""
+    import subprocess
+    import tempfile
 
-    with pdfplumber.open(io.BytesIO(raw_bytes)) as pdf:
-        pages = [page.extract_text() or "" for page in pdf.pages]
-    return "\n".join(pages)
+    with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp_in:
+        tmp_in.write(raw_bytes)
+        tmp_in_path = tmp_in.name
+
+    tmp_out_path = tmp_in_path.replace(".pdf", ".txt")
+
+    try:
+        subprocess.run(
+            ["pdftotext", "-layout", tmp_in_path, tmp_out_path],
+            check=True,
+            capture_output=True,
+        )
+        with open(tmp_out_path, "r", encoding="utf-8", errors="replace") as f:
+            return f.read()
+    finally:
+        for p in (tmp_in_path, tmp_out_path):
+            if os.path.exists(p):
+                os.remove(p)
 
 
 document_context = ""
@@ -255,56 +272,35 @@ LANG_TO_FILE = {
 # ---------------------------------------------------------------------------
 def generate_pdf_bytes(text: str, title: str | None = None, monospace: bool = False) -> bytes:
     """Render plain text (chat reply or code block) into a downloadable PDF and
-    return the raw bytes.
+    return the raw bytes, using wkhtmltopdf (via pdfkit) -- no Python PDF
+    generation library required.
     """
-    from reportlab.lib.pagesizes import letter
-    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-    from reportlab.lib.enums import TA_LEFT
-    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Preformatted
+    import pdfkit
     from xml.sax.saxutils import escape
 
-    buffer = io.BytesIO()
-    doc = SimpleDocTemplate(
-        buffer,
-        pagesize=letter,
-        leftMargin=54,
-        rightMargin=54,
-        topMargin=54,
-        bottomMargin=54,
-    )
-    styles = getSampleStyleSheet()
-    story = []
+    body_font = "'Courier New', monospace" if monospace else "Arial, sans-serif"
+    safe_text = escape(text)
+    heading_html = f"<h1>{escape(title)}</h1>" if title else ""
 
-    if title:
-        story.append(Paragraph(escape(title), styles["Title"]))
-        story.append(Spacer(1, 12))
+    html = f"""
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <style>
+          body {{ font-family: {body_font}; font-size: 12px; white-space: pre-wrap;
+                  word-wrap: break-word; margin: 40px; }}
+          h1 {{ font-family: Arial, sans-serif; font-size: 20px; }}
+        </style>
+      </head>
+      <body>
+        {heading_html}
+        <div>{safe_text}</div>
+      </body>
+    </html>
+    """
 
-    if monospace:
-        # Preformatted preserves whitespace/newlines exactly -- ideal for code.
-        code_style = ParagraphStyle(
-            "Code",
-            parent=styles["Code"],
-            fontName="Courier",
-            fontSize=9,
-            leading=11,
-            alignment=TA_LEFT,
-        )
-        story.append(Preformatted(text, code_style))
-    else:
-        body_style = ParagraphStyle(
-            "Body",
-            parent=styles["Normal"],
-            fontSize=11,
-            leading=15,
-        )
-        for para in text.split("\n\n"):
-            safe = escape(para).replace("\n", "<br/>")
-            if safe.strip():
-                story.append(Paragraph(safe, body_style))
-                story.append(Spacer(1, 8))
-
-    doc.build(story)
-    return buffer.getvalue()
+    options = {"quiet": ""}
+    return pdfkit.from_string(html, False, options=options)
 
 
 def render_code_tools(lang: str, code: str, key_suffix: str) -> None:
@@ -314,7 +310,7 @@ def render_code_tools(lang: str, code: str, key_suffix: str) -> None:
     file_name = f"generated{ext}"
 
     if lang == "html":
-        with st.expander("Preview generated page", expanded=True):
+        with st.expander("🌐 Preview generated page", expanded=True):
             components.html(code, height=500, scrolling=True)
 
     col1, col2 = st.columns(2)
