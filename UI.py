@@ -114,12 +114,20 @@ MAX_DOC_CHARS = 20_000  # keep the system prompt from ballooning / blowing the c
 
 
 def extract_pdf_text(raw_bytes: bytes) -> str:
-    """Extract text from a PDF's raw bytes using pypdf."""
-    from pypdf import PdfReader
+    """Extract text from a PDF's raw bytes using LangChain's PyPDFLoader."""
+    import tempfile
+    from langchain_community.document_loaders import PyPDFLoader
 
-    reader = PdfReader(io.BytesIO(raw_bytes))
-    pages = [page.extract_text() or "" for page in reader.pages]
-    return "\n".join(pages)
+    with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
+        tmp.write(raw_bytes)
+        tmp_path = tmp.name
+
+    try:
+        loader = PyPDFLoader(tmp_path)
+        docs = loader.load()
+        return "\n".join(doc.page_content for doc in docs)
+    finally:
+        os.remove(tmp_path)
 
 
 document_context = ""
