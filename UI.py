@@ -6,9 +6,7 @@ import streamlit.components.v1 as components
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_mistralai import ChatMistralAI
 
-# ---------------------------------------------------------------------------
-# UI basics
-# ---------------------------------------------------------------------------
+
 st.set_page_config(page_title="Multi-personal AI Chatbot", layout="centered")
 
 if os.path.exists("Image.png"):
@@ -163,7 +161,7 @@ if uploaded_file is not None:
     except Exception as e:
         st.sidebar.error("Error reading file: " + str(e))
 
-# Predefined persona configs (extend this dict as needed)
+
 PERSONA_CONFIGS = {
     "Motivation": {
         "title": "Mindset Master AI",
@@ -267,9 +265,7 @@ LANG_TO_FILE = {
 }
 
 
-# ---------------------------------------------------------------------------
-# PDF export (download) helpers
-# ---------------------------------------------------------------------------
+
 def generate_pdf_bytes(text: str, title: str | None = None, monospace: bool = False) -> bytes:
     """Render plain text (chat reply or code block) into a downloadable PDF and
     return the raw bytes, using matplotlib's built-in PDF backend -- no
@@ -285,7 +281,6 @@ def generate_pdf_bytes(text: str, title: str | None = None, monospace: bool = Fa
     chars_per_line = 100 if monospace else 90
     lines_per_page = 60
 
-    # Wrap text into fixed-width lines, preserving existing newlines.
     wrapped_lines: list[str] = []
     for raw_line in text.split("\n"):
         if raw_line.strip() == "":
