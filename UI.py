@@ -1,4 +1,5 @@
 import os
+import io
 import re
 import streamlit as st
 import streamlit.components.v1 as components
@@ -14,7 +15,19 @@ if os.path.exists("Image.png"):
     st.image("Image.png", width=150)
 
 # Mistral API key
-os.environ["MISTRAL_API_KEY"] = "EpgVFLlyQVkXWFmHv0lDwsMlZymmDoGP"
+# SECURITY NOTE: don't hardcode secrets in source. Set MISTRAL_API_KEY as a real
+# environment variable, or put it in .streamlit/secrets.toml as:
+#   MISTRAL_API_KEY = "your-key-here"
+# and it'll be picked up automatically below.
+if "MISTRAL_API_KEY" not in os.environ:
+    try:
+        os.environ["MISTRAL_API_KEY"] = st.secrets["MISTRAL_API_KEY"]
+    except Exception:
+        st.error(
+            "MISTRAL_API_KEY is not set. Add it to your environment or "
+            ".streamlit/secrets.toml before running."
+        )
+        st.stop()
 
 
 # Model factory (cached)
@@ -102,7 +115,6 @@ MAX_DOC_CHARS = 20_000  # keep the system prompt from ballooning / blowing the c
 
 def extract_pdf_text(raw_bytes: bytes) -> str:
     """Extract text from a PDF's raw bytes using pypdf."""
-    import io
     from pypdf import PdfReader
 
     reader = PdfReader(io.BytesIO(raw_bytes))
@@ -238,8 +250,66 @@ LANG_TO_FILE = {
 }
 
 
+# ---------------------------------------------------------------------------
+# PDF export (download) helpers
+# ---------------------------------------------------------------------------
+def generate_pdf_bytes(text: str, title: str | None = None, monospace: bool = False) -> bytes:
+    """Render plain text (chat reply or code block) into a downloadable PDF and
+    return the raw bytes.
+    """
+    from reportlab.lib.pagesizes import letter
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.enums import TA_LEFT
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Preformatted
+    from xml.sax.saxutils import escape
+
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=letter,
+        leftMargin=54,
+        rightMargin=54,
+        topMargin=54,
+        bottomMargin=54,
+    )
+    styles = getSampleStyleSheet()
+    story = []
+
+    if title:
+        story.append(Paragraph(escape(title), styles["Title"]))
+        story.append(Spacer(1, 12))
+
+    if monospace:
+        # Preformatted preserves whitespace/newlines exactly -- ideal for code.
+        code_style = ParagraphStyle(
+            "Code",
+            parent=styles["Code"],
+            fontName="Courier",
+            fontSize=9,
+            leading=11,
+            alignment=TA_LEFT,
+        )
+        story.append(Preformatted(text, code_style))
+    else:
+        body_style = ParagraphStyle(
+            "Body",
+            parent=styles["Normal"],
+            fontSize=11,
+            leading=15,
+        )
+        for para in text.split("\n\n"):
+            safe = escape(para).replace("\n", "<br/>")
+            if safe.strip():
+                story.append(Paragraph(safe, body_style))
+                story.append(Spacer(1, 8))
+
+    doc.build(story)
+    return buffer.getvalue()
+
+
 def render_code_tools(lang: str, code: str, key_suffix: str) -> None:
-    """Show a live HTML preview (if applicable) and a download button for a code block."""
+    """Show a live HTML preview (if applicable) and download buttons (native
+    format + PDF) for a code block."""
     ext, mime = LANG_TO_FILE.get(lang, (".txt", "text/plain"))
     file_name = f"generated{ext}"
 
@@ -247,12 +317,35 @@ def render_code_tools(lang: str, code: str, key_suffix: str) -> None:
         with st.expander("🌐 Preview generated page", expanded=True):
             components.html(code, height=500, scrolling=True)
 
+    col1, col2 = st.columns(2)
+    with col1:
+        st.download_button(
+            label=f" Download {file_name}",
+            data=code,
+            file_name=file_name,
+            mime=mime,
+            key=f"download_{key_suffix}_{lang}",
+        )
+    with col2:
+        pdf_bytes = generate_pdf_bytes(code, title=f"Generated {lang} code", monospace=True)
+        st.download_button(
+            label=" Download as PDF",
+            data=pdf_bytes,
+            file_name=f"generated_{lang}.pdf",
+            mime="application/pdf",
+            key=f"download_pdf_{key_suffix}_{lang}",
+        )
+
+
+def render_message_pdf_button(content: str, key_suffix: str) -> None:
+    """Let the user download a full assistant reply as a PDF."""
+    pdf_bytes = generate_pdf_bytes(content, title="AI Response")
     st.download_button(
-        label=f" Download {file_name}",
-        data=code,
-        file_name=file_name,
-        mime=mime,
-        key=f"download_{key_suffix}_{lang}",
+        label=" Download reply as PDF",
+        data=pdf_bytes,
+        file_name="ai_response.pdf",
+        mime="application/pdf",
+        key=f"download_reply_pdf_{key_suffix}",
     )
 
 
@@ -295,6 +388,7 @@ for idx, msg in enumerate(st.session_state.messages):
     elif isinstance(msg, AIMessage):
         with st.chat_message("assistant"):
             st.write(msg.content)
+            render_message_pdf_button(msg.content, key_suffix=f"history_{idx}")
             for block_idx, (lang, code) in enumerate(extract_code_blocks(msg.content)):
                 render_code_tools(lang, code, key_suffix=f"history_{idx}_{block_idx}")
     # SystemMessage is intentionally not rendered in the chat UI
@@ -313,6 +407,7 @@ if user_input := st.chat_input(current_config["input_placeholder"]):
                 st.write(content)
                 st.session_state.messages.append(AIMessage(content=content))
 
+                render_message_pdf_button(content, key_suffix="latest")
                 for block_idx, (lang, code) in enumerate(extract_code_blocks(content)):
                     render_code_tools(lang, code, key_suffix=f"latest_{block_idx}")
             except Exception as e:
