@@ -21,6 +21,7 @@ DESIGN_CSS = """
 
 :root {
     --ink: #1B1230;
+    --bg-app: #1B1230;
     --panel: #241A3D;
     --panel-2: #2C2049;
     --marigold: #F5A623;
@@ -30,13 +31,27 @@ DESIGN_CSS = """
     --border: #3A2C5A;
 }
 
+/* Light mode: swap backgrounds + text so contrast stays correct.
+   --ink, --marigold, --coral stay fixed (they're always the dark text
+   sitting on the gold stub/navbar, regardless of mode). */
+@media (prefers-color-scheme: light) {
+    :root {
+        --bg-app: #FBF7F0;
+        --panel: #FFFFFF;
+        --panel-2: #FFF3DE;
+        --text-primary: #1B1230;
+        --text-muted: #6B5E86;
+        --border: #E8D9BE;
+    }
+}
+
 html, body, [class*="css"] {
     font-family: 'Inter', sans-serif;
     color: var(--text-primary);
 }
 
 .stApp {
-    background: var(--ink);
+    background: var(--bg-app);
 }
 
 /* Sidebar = departure board */
@@ -267,7 +282,7 @@ div[data-testid="stAppViewContainer"] .stMarkdown span {
 
 /* Scrollbar */
 ::-webkit-scrollbar { width: 8px; height: 8px; }
-::-webkit-scrollbar-track { background: var(--ink); }
+::-webkit-scrollbar-track { background: var(--bg-app); }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 8px; }
 
 /* File uploader box */
