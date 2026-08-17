@@ -9,12 +9,7 @@ from langchain_mistralai import ChatMistralAI
 
 st.set_page_config(page_title="Boarding: AI Experts", page_icon="", layout="centered")
 
-# ---------------------------------------------------------------------------
-# Design system: "Boarding Pass"
-# Picking a persona = boarding a flight into that expert's world. The header
-# renders as a literal ticket stub with a channel number, a torn-perforation
-# divider, and a rotated stamp. Everything else stays quiet around it.
-# ---------------------------------------------------------------------------
+
 DESIGN_CSS = """
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap');
