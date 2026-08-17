@@ -7,7 +7,7 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_mistralai import ChatMistralAI
 
 
-st.set_page_config(page_title="Boarding: AI Experts", page_icon="🎫", layout="centered")
+st.set_page_config(page_title="Boarding: AI Experts", page_icon="", layout="centered")
 
 
 DESIGN_CSS = """
@@ -260,11 +260,7 @@ st.markdown(
 if os.path.exists("Image.png"):
     st.image("Image.png", width=150)
 
-# Mistral API key
-# SECURITY NOTE: don't hardcode secrets in source. Set MISTRAL_API_KEY as a real
-# environment variable, or put it in .streamlit/secrets.toml as:
-#   MISTRAL_API_KEY = "your-key-here"
-# and it'll be picked up automatically below.
+
 if "MISTRAL_API_KEY" not in os.environ:
     try:
         os.environ["MISTRAL_API_KEY"] = "fE2OLrga4hpKHkGXCn8n5Ck35wCwIq0L"
@@ -272,14 +268,14 @@ if "MISTRAL_API_KEY" not in os.environ:
         st.error(
             "MISTRAL_API_KEY is not set. Add it to your environment or "
             ".streamlit/secrets.toml before running."
-        )
+    
         st.stop()
 
 
 # Model factory (cached)
 @st.cache_resource
 def get_model():
-    # adjust model name / temperature if needed
+    
     return ChatMistralAI(model="mistral-small-2506", temperature=0.9)
 
 
