@@ -7,7 +7,139 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_mistralai import ChatMistralAI
 
 
-st.set_page_config(page_title="Multi-personal AI Chatbot", layout="centered")
+st.set_page_config(page_title="Multi-Expert AI Console", page_icon="📡", layout="centered")
+
+# ---------------------------------------------------------------------------
+# Design system
+# A "dispatch console" look: every persona is a channel you tune into.
+# Deep ink background, warm brass accent, monospace channel labels.
+# ---------------------------------------------------------------------------
+DESIGN_CSS = """
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap');
+
+:root {
+    --bg-app: #10151C;
+    --bg-panel: #161D27;
+    --bg-panel-2: #1D2530;
+    --accent: #E8A33D;
+    --accent-soft: #3A4A5C;
+    --text-primary: #EDEFF2;
+    --text-muted: #8B96A5;
+    --border: #262F3B;
+}
+
+html, body, [class*="css"] {
+    font-family: 'Inter', sans-serif;
+    color: var(--text-primary);
+}
+
+.stApp {
+    background: radial-gradient(circle at top left, #141B24 0%, var(--bg-app) 55%);
+}
+
+/* Sidebar */
+section[data-testid="stSidebar"] {
+    background-color: var(--bg-panel);
+    border-right: 1px solid var(--border);
+}
+section[data-testid="stSidebar"] h1,
+section[data-testid="stSidebar"] .stMarkdown h3 {
+    font-family: 'Space Grotesk', sans-serif;
+    letter-spacing: 0.02em;
+}
+section[data-testid="stSidebar"] label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted) !important;
+}
+
+/* Channel header block */
+.console-header {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    padding: 1.1rem 1.4rem;
+    margin-bottom: 1.4rem;
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    border-radius: 10px;
+    background: linear-gradient(135deg, var(--bg-panel) 0%, var(--bg-panel-2) 100%);
+}
+.console-badge {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.72rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--accent);
+}
+.console-badge::before {
+    content: "● ";
+    color: var(--accent);
+}
+.console-title {
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 700;
+    font-size: 1.9rem;
+    line-height: 1.15;
+    margin: 0;
+    color: var(--text-primary);
+}
+.console-subtitle {
+    font-family: 'Inter', sans-serif;
+    font-size: 0.95rem;
+    color: var(--text-muted);
+    margin: 0;
+}
+
+/* Chat messages */
+div[data-testid="stChatMessage"] {
+    background-color: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 0.6rem 0.4rem;
+    margin-bottom: 0.6rem;
+}
+
+/* Buttons */
+.stButton > button, .stDownloadButton > button {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.8rem;
+    background-color: transparent;
+    color: var(--accent);
+    border: 1px solid var(--accent-soft);
+    border-radius: 6px;
+    transition: all 0.15s ease-in-out;
+}
+.stButton > button:hover, .stDownloadButton > button:hover {
+    background-color: var(--accent);
+    color: #10151C;
+    border-color: var(--accent);
+}
+
+/* Chat input */
+[data-testid="stChatInput"] {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background-color: var(--bg-panel);
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: var(--bg-app); }
+::-webkit-scrollbar-thumb { background: var(--accent-soft); border-radius: 8px; }
+
+/* File uploader box */
+[data-testid="stFileUploaderDropzone"] {
+    background-color: var(--bg-panel-2);
+    border: 1px dashed var(--border);
+    border-radius: 8px;
+}
+</style>
+"""
+st.markdown(DESIGN_CSS, unsafe_allow_html=True)
 
 if os.path.exists("Image.png"):
     st.image("Image.png", width=150)
@@ -37,7 +169,12 @@ def get_model():
 
 model = get_model()
 
-st.sidebar.title("Chat Setting")
+st.sidebar.markdown(
+    "<span style='font-family:IBM Plex Mono, monospace; font-size:0.75rem; "
+    "letter-spacing:0.1em; color:#8B96A5; text-transform:uppercase;'>Console</span>",
+    unsafe_allow_html=True,
+)
+st.sidebar.title("Select a Channel")
 
 persona_options = [
     "Amazon",
@@ -101,7 +238,7 @@ persona = st.sidebar.selectbox(
 )
 
 st.sidebar.markdown("---")
-st.sidebar.title("Paper / Document")
+st.sidebar.title("Reference Document")
 
 uploaded_file = st.sidebar.file_uploader(
     "Upload a text document or paper context:",
@@ -403,8 +540,16 @@ if needs_reset:
     st.session_state.last_doc_name = current_doc_name
     st.session_state.messages = [SystemMessage(content=final_system_prompt)]
 
-st.title(current_config["title"])
-st.subheader(current_config["subtitle"])
+st.markdown(
+    f"""
+    <div class="console-header">
+        <span class="console-badge">Active Channel &middot; {persona}</span>
+        <p class="console-title">{current_config["title"]}</p>
+        <p class="console-subtitle">{current_config["subtitle"]}</p>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
 
 if st.sidebar.button("Clear Chat History"):
     st.session_state.messages = [SystemMessage(content=final_system_prompt)]
