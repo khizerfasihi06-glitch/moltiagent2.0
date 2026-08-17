@@ -352,7 +352,7 @@ st.markdown(
 )
 
 if os.path.exists("Image.png"):
-    st.image("Image.png", width=150)
+    st.image("water", width=150)
 
 # Mistral API key
 # SECURITY NOTE: don't hardcode secrets in source. Set MISTRAL_API_KEY as a real
