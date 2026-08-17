@@ -29,7 +29,7 @@ DESIGN_CSS = """
    dark text sitting on the gold stub/navbar, regardless of theme. */
 :root {
     --ink: #1B1230;
-    --marigold: #F5A623;
+    --marigold: #2E86FF;
     --coral: #FF5F87;
 
     --bg-app: var(--background-color, #1B1230);
@@ -324,6 +324,11 @@ div[data-testid="stAppViewContainer"] .stMarkdown span {
     background-color: var(--panel-2);
     border: 1px dashed var(--border);
     border-radius: 8px;
+}
+[data-testid="stFileUploaderDropzoneInstructions"] small,
+[data-testid="stFileUploaderDropzoneInstructions"] span,
+[data-testid="stFileUploaderDropzone"] small {
+    color: var(--marigold) !important;
 }
 </style>
 """
