@@ -58,24 +58,6 @@ html, body, [class*="css"] {
 section[data-testid="stSidebar"] {
     background-color: var(--panel);
     border-right: 1px dashed var(--border);
-    padding-top: 56px;
-    position: relative;
-}
-/* The collapse ("<<") button is absolutely positioned inside the sidebar,
-   so the padding-top above doesn't move it - pin it explicitly instead. */
-section[data-testid="stSidebar"] [data-testid="stSidebarCollapseButton"],
-section[data-testid="stSidebar"] button[kind="headerNoPadding"],
-section[data-testid="stSidebar"] [data-testid="baseButton-headerNoPadding"] {
-    position: absolute !important;
-    top: 64px !important;
-    z-index: 1000002 !important;
-    opacity: 1 !important;
-    visibility: visible !important;
-}
-section[data-testid="stSidebar"] [data-testid="stSidebarCollapseButton"] svg,
-section[data-testid="stSidebar"] button[kind="headerNoPadding"] svg {
-    fill: var(--text-primary) !important;
-    color: var(--text-primary) !important;
 }
 section[data-testid="stSidebar"] h1 {
     font-family: 'Fraunces', serif;
@@ -197,19 +179,18 @@ section[data-testid="stSidebar"] label {
 }
 
 /* ---------------- Top navbar ---------------- */
+/* Sits in normal page flow, right above the ticket header - not fixed, so
+   it never fights Streamlit's own header for space or blocks its buttons. */
 .topnav {
-    position: fixed;
-    top: 0;
-    left: 0;
     width: 100%;
-    height: 56px;
     background: var(--marigold);
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0 1.6rem;
-    z-index: 999999;
-    box-shadow: 0 2px 14px rgba(0,0,0,0.35);
+    padding: 0.7rem 1.4rem;
+    border-radius: 10px;
+    margin-bottom: 1rem;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.25);
 }
 .topnav-brand {
     font-family: 'Fraunces', serif;
@@ -245,28 +226,10 @@ section[data-testid="stSidebar"] label {
     transform-origin: center bottom;
 }
 
-/* push page content below the fixed navbar + Streamlit's own header row */
-div[data-testid="stAppViewContainer"] > .main {
-    padding-top: 104px;
-}
+/* Streamlit's own header stays exactly where Streamlit puts it - just make
+   it transparent so it blends with our background. */
 header[data-testid="stHeader"] {
     background: transparent;
-    position: fixed;
-    top: 56px;
-}
-
-/* Keep the mobile sidebar toggle (">>") clickable, pushed below the navbar */
-[data-testid="stSidebarCollapsedControl"],
-[data-testid="stSidebarCollapseButton"],
-[data-testid="baseButton-headerNoPadding"] {
-    z-index: 1000001 !important;
-    position: relative;
-}
-header[data-testid="stHeader"] {
-    z-index: 1000001 !important;
-}
-.topnav {
-    z-index: 999997;
 }
 
 /* Header toolbar icons (GitHub / Share / "..." menu) were invisible: dark
