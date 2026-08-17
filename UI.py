@@ -331,8 +331,8 @@ st.markdown(DESIGN_CSS, unsafe_allow_html=True)
 st.markdown(
     """
     <div class="topnav">
-        <span class="topnav-brand"><span class="fire-emoji">🔥</span> Expert Boarding</span>
-        <span class="topnav-status">Now Boarding</span>
+        <span class="topnav-brand"><span class="fire-emoji">🔥</span>Avatar/Fire</span>
+        <span class="topnav-status">Avatar uses their powered now you can use this power as word too.</span>
     </div>
     """,
     unsafe_allow_html=True,
