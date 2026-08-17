@@ -7,9 +7,14 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_mistralai import ChatMistralAI
 
 
-st.set_page_config(page_title="Multi AI Aatar", page_icon="💧", layout="centered")
+st.set_page_config(page_title="Boarding: AI Experts", page_icon="🎫", layout="centered")
 
-
+# ---------------------------------------------------------------------------
+# Design system: "Boarding Pass"
+# Picking a persona = boarding a flight into that expert's world. The header
+# renders as a literal ticket stub with a channel number, a torn-perforation
+# divider, and a rotated stamp. Everything else stays quiet around it.
+# ---------------------------------------------------------------------------
 DESIGN_CSS = """
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap');
@@ -266,7 +271,7 @@ div[data-testid="stChatMessage"] .stMarkdown {
 }
 div[data-testid="stChatMessage"] code {
     color: var(--marigold) !important;
-    background-color: rgba(245, 166, 35, 0.12) !important;
+    background-color: color-mix(in srgb, var(--marigold) 12%, transparent) !important;
 }
 
 /* Chat input text */
@@ -339,15 +344,15 @@ st.markdown(DESIGN_CSS, unsafe_allow_html=True)
 st.markdown(
     """
     <div class="topnav">
-        <span class="topnav-brand"><span class="fire-emoji">💧</span> Avatar/A.I.R</span>
+        <span class="topnav-brand"><span class="fire-emoji">🔥</span> Expert Boarding</span>
         <span class="topnav-status">Now Boarding</span>
     </div>
     """,
     unsafe_allow_html=True,
 )
 
-if os.path.exists("water"):
-    st.image("water", width=150)
+if os.path.exists("water.png"):
+    st.image("water.png", width=150)
 
 # Mistral API key
 # SECURITY NOTE: don't hardcode secrets in source. Set MISTRAL_API_KEY as a real
@@ -376,7 +381,7 @@ model = get_model()
 
 st.sidebar.markdown(
     "<span style='font-family:IBM Plex Mono, monospace; font-size:0.75rem; "
-    "letter-spacing:0.1em; color:#A79BC4; text-transform:uppercase;'>Departures</span>",
+    "letter-spacing:0.1em; color:var(--text-muted); text-transform:uppercase;'>Departures</span>",
     unsafe_allow_html=True,
 )
 st.sidebar.title("Choose Your Flight")
@@ -720,6 +725,10 @@ def render_message_pdf_button(content: str, key_suffix: str) -> None:
     )
 
 
+USER_AVATAR = "🧑‍💻"
+ASSISTANT_AVATAR = "🤖"
+
+
 current_config = PERSONA_CONFIGS.get(persona, make_default_config(persona))
 
 # Build final system prompt including uploaded document context if present
@@ -767,7 +776,7 @@ st.markdown(
         </div>
         <div class="ticket-perf"></div>
         <div class="ticket-main">
-            <span class="ticket-stamp">On Air</span>
+            <span class="ticket-stamp">💧 On Air</span>
             <span class="ticket-eyebrow">Boarding &middot; {persona}</span>
             <p class="ticket-title">{current_config["title"]}</p>
             <p class="ticket-subtitle">{current_config["subtitle"]}</p>
@@ -784,10 +793,10 @@ if st.sidebar.button("Clear Chat History"):
 # Render chat history
 for idx, msg in enumerate(st.session_state.messages):
     if isinstance(msg, HumanMessage):
-        with st.chat_message("user"):
+        with st.chat_message("user", avatar=USER_AVATAR):
             st.write(msg.content)
     elif isinstance(msg, AIMessage):
-        with st.chat_message("assistant"):
+        with st.chat_message("assistant", avatar=ASSISTANT_AVATAR):
             st.write(msg.content)
             render_message_pdf_button(msg.content, key_suffix=f"history_{idx}")
             for block_idx, (lang, code) in enumerate(extract_code_blocks(msg.content)):
@@ -796,11 +805,11 @@ for idx, msg in enumerate(st.session_state.messages):
 
 # Chat input
 if user_input := st.chat_input(current_config["input_placeholder"]):
-    with st.chat_message("user"):
+    with st.chat_message("user", avatar=USER_AVATAR):
         st.write(user_input)
     st.session_state.messages.append(HumanMessage(content=user_input))
 
-    with st.chat_message("assistant"):
+    with st.chat_message("assistant", avatar=ASSISTANT_AVATAR):
         with st.spinner(current_config.get("spinner", "Thinking...")):
             try:
                 response = model.invoke(st.session_state.messages)
