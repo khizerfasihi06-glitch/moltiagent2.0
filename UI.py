@@ -54,6 +54,20 @@ html, body, [class*="css"] {
     background: var(--bg-app);
 }
 
+/* Smooth, quiet transition when the person toggles Light/Dark in Settings,
+   instead of every panel snapping instantly. Respect reduced-motion. */
+.stApp, section[data-testid="stSidebar"], .ticket, div[data-testid="stChatMessage"],
+[data-testid="stFileUploaderDropzone"], [data-testid="stChatInput"] {
+    transition: background-color 0.25s ease, border-color 0.25s ease, color 0.25s ease, box-shadow 0.25s ease;
+}
+@media (prefers-reduced-motion: reduce) {
+    .stApp, section[data-testid="stSidebar"], .ticket, div[data-testid="stChatMessage"],
+    [data-testid="stFileUploaderDropzone"], [data-testid="stChatInput"], .fire-emoji {
+        transition: none !important;
+        animation: none !important;
+    }
+}
+
 /* Sidebar = departure board */
 section[data-testid="stSidebar"] {
     background-color: var(--panel);
@@ -78,7 +92,7 @@ section[data-testid="stSidebar"] label {
     margin-bottom: 1.6rem;
     border-radius: 14px;
     overflow: hidden;
-    box-shadow: 0 12px 30px rgba(0,0,0,0.35);
+    box-shadow: 0 12px 30px color-mix(in srgb, var(--ink) 35%, transparent);
     background: var(--panel);
     position: relative;
 }
@@ -337,6 +351,17 @@ div[data-testid="stAppViewContainer"] .stMarkdown span {
 [data-testid="stFileUploaderDropzoneInstructions"] span,
 [data-testid="stFileUploaderDropzone"] small {
     color: var(--marigold) !important;
+}
+
+/* Visible keyboard focus - the custom palette can otherwise hide Streamlit's
+   default focus ring, so make it explicit and consistent everywhere. */
+.stButton > button:focus-visible,
+.stDownloadButton > button:focus-visible,
+[data-testid="stFileUploaderDropzone"]:focus-within,
+[data-testid="stChatInput"]:focus-within,
+div[data-baseweb="select"]:focus-within {
+    outline: 2px solid var(--marigold) !important;
+    outline-offset: 2px;
 }
 </style>
 """
