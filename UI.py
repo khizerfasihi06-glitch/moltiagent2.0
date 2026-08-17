@@ -754,7 +754,7 @@ def render_code_tools(lang: str, code: str, key_suffix: str) -> None:
     file_name = ext if ext == "Dockerfile" else f"generated{ext}"
 
     if lang == "html":
-        with st.expander("🌐 Preview generated page", expanded=True):
+        with st.expander(" Preview generated page", expanded=True):
             components.html(code, height=500, scrolling=True)
 
     col1, col2 = st.columns(2)
@@ -789,8 +789,8 @@ def render_message_pdf_button(content: str, key_suffix: str) -> None:
     )
 
 
-USER_AVATAR = "🧑‍💻"
-ASSISTANT_AVATAR = "🤖"
+USER_AVATAR = "💧"
+ASSISTANT_AVATAR = "💧"
 
 
 current_config = PERSONA_CONFIGS.get(persona, make_default_config(persona))
