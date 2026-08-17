@@ -7,26 +7,27 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_mistralai import ChatMistralAI
 
 
-st.set_page_config(page_title="Multi-Expert AI Console", page_icon="📡", layout="centered")
+st.set_page_config(page_title="Boarding: AI Experts", page_icon="🎫", layout="centered")
 
 # ---------------------------------------------------------------------------
-# Design system
-# A "dispatch console" look: every persona is a channel you tune into.
-# Deep ink background, warm brass accent, monospace channel labels.
+# Design system: "Boarding Pass"
+# Picking a persona = boarding a flight into that expert's world. The header
+# renders as a literal ticket stub with a channel number, a torn-perforation
+# divider, and a rotated stamp. Everything else stays quiet around it.
 # ---------------------------------------------------------------------------
 DESIGN_CSS = """
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap');
 
 :root {
-    --bg-app: #10151C;
-    --bg-panel: #161D27;
-    --bg-panel-2: #1D2530;
-    --accent: #E8A33D;
-    --accent-soft: #3A4A5C;
-    --text-primary: #EDEFF2;
-    --text-muted: #8B96A5;
-    --border: #262F3B;
+    --ink: #1B1230;
+    --panel: #241A3D;
+    --panel-2: #2C2049;
+    --marigold: #F5A623;
+    --coral: #FF5F87;
+    --text-primary: #F5F1FA;
+    --text-muted: #A79BC4;
+    --border: #3A2C5A;
 }
 
 html, body, [class*="css"] {
@@ -35,105 +36,174 @@ html, body, [class*="css"] {
 }
 
 .stApp {
-    background: radial-gradient(circle at top left, #141B24 0%, var(--bg-app) 55%);
+    background: var(--ink);
 }
 
-/* Sidebar */
+/* Sidebar = departure board */
 section[data-testid="stSidebar"] {
-    background-color: var(--bg-panel);
-    border-right: 1px solid var(--border);
+    background-color: var(--panel);
+    border-right: 1px dashed var(--border);
 }
-section[data-testid="stSidebar"] h1,
-section[data-testid="stSidebar"] .stMarkdown h3 {
-    font-family: 'Space Grotesk', sans-serif;
-    letter-spacing: 0.02em;
+section[data-testid="stSidebar"] h1 {
+    font-family: 'Fraunces', serif;
+    font-weight: 700;
+    letter-spacing: 0.01em;
 }
 section[data-testid="stSidebar"] label {
     font-family: 'IBM Plex Mono', monospace;
-    font-size: 0.78rem;
+    font-size: 0.75rem;
     text-transform: uppercase;
-    letter-spacing: 0.06em;
+    letter-spacing: 0.08em;
     color: var(--text-muted) !important;
 }
 
-/* Channel header block */
-.console-header {
+/* ---------------- Boarding pass header ---------------- */
+.ticket {
+    display: flex;
+    margin-bottom: 1.6rem;
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: 0 12px 30px rgba(0,0,0,0.35);
+    background: var(--panel);
+    position: relative;
+}
+.ticket-stub {
+    flex: 0 0 92px;
+    background: var(--marigold);
+    color: var(--ink);
     display: flex;
     flex-direction: column;
-    gap: 0.35rem;
-    padding: 1.1rem 1.4rem;
-    margin-bottom: 1.4rem;
-    border: 1px solid var(--border);
-    border-left: 3px solid var(--accent);
-    border-radius: 10px;
-    background: linear-gradient(135deg, var(--bg-panel) 0%, var(--bg-panel-2) 100%);
-}
-.console-badge {
+    align-items: center;
+    justify-content: center;
     font-family: 'IBM Plex Mono', monospace;
-    font-size: 0.72rem;
+    padding: 0.8rem 0.4rem;
+    position: relative;
+}
+.ticket-stub .no-label {
+    font-size: 0.62rem;
+    letter-spacing: 0.1em;
+    opacity: 0.75;
+}
+.ticket-stub .no-value {
+    font-size: 1.6rem;
+    font-weight: 600;
+    line-height: 1.1;
+}
+.ticket-perf {
+    flex: 0 0 0;
+    border-left: 2px dashed var(--ink);
+    position: relative;
+}
+.ticket-perf::before, .ticket-perf::after {
+    content: "";
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    background: var(--ink);
+    border-radius: 50%;
+    left: -9px;
+}
+.ticket-perf::before { top: -8px; }
+.ticket-perf::after { bottom: -8px; }
+.ticket-main {
+    flex: 1;
+    padding: 1.1rem 1.4rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    min-width: 0;
+}
+.ticket-eyebrow {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.68rem;
     letter-spacing: 0.12em;
     text-transform: uppercase;
-    color: var(--accent);
+    color: var(--text-muted);
 }
-.console-badge::before {
-    content: "● ";
-    color: var(--accent);
-}
-.console-title {
-    font-family: 'Space Grotesk', sans-serif;
+.ticket-title {
+    font-family: 'Fraunces', serif;
     font-weight: 700;
-    font-size: 1.9rem;
-    line-height: 1.15;
+    font-size: 1.85rem;
+    line-height: 1.12;
     margin: 0;
     color: var(--text-primary);
 }
-.console-subtitle {
+.ticket-subtitle {
     font-family: 'Inter', sans-serif;
-    font-size: 0.95rem;
+    font-size: 0.92rem;
     color: var(--text-muted);
-    margin: 0;
+    margin: 0.1rem 0 0 0;
+}
+.ticket-stamp {
+    position: absolute;
+    top: 14px;
+    right: 18px;
+    transform: rotate(-9deg);
+    border: 2px solid var(--coral);
+    color: var(--coral);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    padding: 3px 9px;
+    border-radius: 6px;
+    text-transform: uppercase;
+}
+.ticket-barcode {
+    display: flex;
+    align-items: flex-end;
+    gap: 2px;
+    height: 20px;
+    margin-top: 0.4rem;
+    opacity: 0.6;
+}
+.ticket-barcode span {
+    display: block;
+    width: 2px;
+    background: var(--text-muted);
 }
 
 /* Chat messages */
 div[data-testid="stChatMessage"] {
-    background-color: var(--bg-panel);
+    background-color: var(--panel);
     border: 1px solid var(--border);
     border-radius: 12px;
     padding: 0.6rem 0.4rem;
     margin-bottom: 0.6rem;
 }
 
-/* Buttons */
+/* Buttons -> ticket-pill style */
 .stButton > button, .stDownloadButton > button {
     font-family: 'IBM Plex Mono', monospace;
-    font-size: 0.8rem;
+    font-size: 0.78rem;
     background-color: transparent;
-    color: var(--accent);
-    border: 1px solid var(--accent-soft);
-    border-radius: 6px;
+    color: var(--marigold);
+    border: 1.5px dashed var(--marigold);
+    border-radius: 999px;
+    padding: 0.35rem 0.9rem;
     transition: all 0.15s ease-in-out;
 }
 .stButton > button:hover, .stDownloadButton > button:hover {
-    background-color: var(--accent);
-    color: #10151C;
-    border-color: var(--accent);
+    background-color: var(--marigold);
+    color: var(--ink);
+    border-style: solid;
 }
 
 /* Chat input */
 [data-testid="stChatInput"] {
     border: 1px solid var(--border);
     border-radius: 10px;
-    background-color: var(--bg-panel);
+    background-color: var(--panel);
 }
 
 /* Scrollbar */
 ::-webkit-scrollbar { width: 8px; height: 8px; }
-::-webkit-scrollbar-track { background: var(--bg-app); }
-::-webkit-scrollbar-thumb { background: var(--accent-soft); border-radius: 8px; }
+::-webkit-scrollbar-track { background: var(--ink); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 8px; }
 
 /* File uploader box */
 [data-testid="stFileUploaderDropzone"] {
-    background-color: var(--bg-panel-2);
+    background-color: var(--panel-2);
     border: 1px dashed var(--border);
     border-radius: 8px;
 }
@@ -171,10 +241,10 @@ model = get_model()
 
 st.sidebar.markdown(
     "<span style='font-family:IBM Plex Mono, monospace; font-size:0.75rem; "
-    "letter-spacing:0.1em; color:#8B96A5; text-transform:uppercase;'>Console</span>",
+    "letter-spacing:0.1em; color:#A79BC4; text-transform:uppercase;'>Departures</span>",
     unsafe_allow_html=True,
 )
-st.sidebar.title("Select a Channel")
+st.sidebar.title("Choose Your Flight")
 
 persona_options = [
     "Amazon",
@@ -540,12 +610,34 @@ if needs_reset:
     st.session_state.last_doc_name = current_doc_name
     st.session_state.messages = [SystemMessage(content=final_system_prompt)]
 
+try:
+    channel_no = f"{persona_options.index(persona) + 1:03d}"
+except ValueError:
+    channel_no = "N/A"
+
+# Deterministic little "barcode" flourish so it's not identical for every persona
+_bar_seed = sum(ord(c) for c in persona)
+_bar_widths = [2 + ((_bar_seed * (i + 3)) % 5) for i in range(28)]
+_barcode_html = "".join(
+    f'<span style="width:{2 if i % 3 == 0 else 3}px; height:{w * 2}px;"></span>'
+    for i, w in enumerate(_bar_widths)
+)
+
 st.markdown(
     f"""
-    <div class="console-header">
-        <span class="console-badge">Active Channel &middot; {persona}</span>
-        <p class="console-title">{current_config["title"]}</p>
-        <p class="console-subtitle">{current_config["subtitle"]}</p>
+    <div class="ticket">
+        <div class="ticket-stub">
+            <span class="no-label">CHANNEL</span>
+            <span class="no-value">{channel_no}</span>
+        </div>
+        <div class="ticket-perf"></div>
+        <div class="ticket-main">
+            <span class="ticket-stamp">On Air</span>
+            <span class="ticket-eyebrow">Boarding &middot; {persona}</span>
+            <p class="ticket-title">{current_config["title"]}</p>
+            <p class="ticket-subtitle">{current_config["subtitle"]}</p>
+            <div class="ticket-barcode">{_barcode_html}</div>
+        </div>
     </div>
     """,
     unsafe_allow_html=True,
