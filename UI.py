@@ -7,7 +7,7 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_mistralai import ChatMistralAI
 
 
-st.set_page_config(page_title="Boarding: AI Experts", page_icon="🎫", layout="centered")
+st.set_page_config(page_title="Avatar AI", page_icon="🔥", layout="centered")
 
 # ---------------------------------------------------------------------------
 # Design system: "Boarding Pass"
