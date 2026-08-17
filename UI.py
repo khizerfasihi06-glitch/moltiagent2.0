@@ -354,14 +354,11 @@ div[data-testid="stAppViewContainer"] .stMarkdown span {
     background-color: var(--marigold) !important;
     box-shadow: none !important;
 }
-/* The inner textarea (and its wrapping divs) can carry their own opaque
-   background + native border/outline from Streamlit's base styling, which
-   sits on top of the blue container above and hides it entirely - that's
-   why the bar looked white/gray instead of blue. Force them transparent
-   and strip their own border/outline so the container's blue and border
-   are the only ones visible, with no doubled ring. */
-[data-testid="stChatInput"] > div,
-[data-testid="stChatInput"] textarea {
+/* Streamlit wraps the actual textarea in several nested divs, any of which
+   can carry its own opaque background from base styling and hide the blue
+   set above. Force every descendant transparent with no border/outline of
+   its own, so the container's blue is the only thing visible. */
+[data-testid="stChatInput"] * {
     background-color: transparent !important;
     border: none !important;
     outline: none !important;
