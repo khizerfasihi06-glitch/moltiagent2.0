@@ -349,15 +349,20 @@ div[data-testid="stAppViewContainer"] .stMarkdown span {
 
 /* Chat input */
 [data-testid="stChatInput"] {
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    background-color: var(--marigold);
+    border: 1px solid var(--border) !important;
+    border-radius: 10px !important;
+    background-color: var(--marigold) !important;
+    box-shadow: none !important;
 }
-/* The inner textarea can carry its own native browser border/outline that
-   stacks visually with the container border above, producing a double ring.
-   Reset it explicitly so our container border is the only one shown. */
-[data-testid="stChatInput"] textarea,
-[data-testid="stChatInput"] > div {
+/* The inner textarea (and its wrapping divs) can carry their own opaque
+   background + native border/outline from Streamlit's base styling, which
+   sits on top of the blue container above and hides it entirely - that's
+   why the bar looked white/gray instead of blue. Force them transparent
+   and strip their own border/outline so the container's blue and border
+   are the only ones visible, with no doubled ring. */
+[data-testid="stChatInput"] > div,
+[data-testid="stChatInput"] textarea {
+    background-color: transparent !important;
     border: none !important;
     outline: none !important;
     box-shadow: none !important;
@@ -393,10 +398,12 @@ div[data-testid="stAppViewContainer"] .stMarkdown span {
 .stButton > button:focus-visible,
 .stDownloadButton > button:focus-visible,
 [data-testid="stFileUploaderDropzone"]:focus-within,
-[data-testid="stChatInput"]:focus-within,
 div[data-baseweb="select"]:focus-within {
     outline: 2px solid var(--marigold) !important;
     outline-offset: 2px;
+}
+[data-testid="stChatInput"]:focus-within {
+    box-shadow: 0 0 0 2px var(--marigold) !important;
 }
 </style>
 """
