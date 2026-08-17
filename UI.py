@@ -276,11 +276,11 @@ div[data-testid="stChatMessage"] code {
 
 /* Chat input text */
 [data-testid="stChatInput"] textarea {
-    color: var(--ink) !important;
+    color: #FFFFFF !important;
 }
 [data-testid="stChatInput"] textarea::placeholder {
-    color: var(--ink) !important;
-    opacity: 0.65;
+    color: #FFFFFF !important;
+    opacity: 0.75;
 }
 
 /* Any other body / markdown text in the main area */
@@ -315,11 +315,11 @@ div[data-testid="stAppViewContainer"] .stMarkdown span {
 }
 
 /* Send button icon inside the chat input was hardcoded black - force it to
-   dark ink so it stays visible on the new blue input background. */
+   white so it stays visible on the new blue input background. */
 [data-testid="stChatInputSubmitButton"] svg,
 [data-testid="stChatInput"] button svg {
-    fill: var(--ink) !important;
-    color: var(--ink) !important;
+    fill: #FFFFFF !important;
+    color: #FFFFFF !important;
 }
 
 /* Scrollbar */
