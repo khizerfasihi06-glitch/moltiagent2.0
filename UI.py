@@ -314,6 +314,14 @@ div[data-testid="stAppViewContainer"] .stMarkdown span {
     background-color: var(--panel);
 }
 
+/* Send button icon inside the chat input was hardcoded black - force it to
+   the accent blue in both themes. */
+[data-testid="stChatInputSubmitButton"] svg,
+[data-testid="stChatInput"] button svg {
+    fill: var(--marigold) !important;
+    color: var(--marigold) !important;
+}
+
 /* Scrollbar */
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: var(--bg-app); }
