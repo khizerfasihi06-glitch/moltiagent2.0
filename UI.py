@@ -59,6 +59,23 @@ section[data-testid="stSidebar"] {
     background-color: var(--panel);
     border-right: 1px dashed var(--border);
     padding-top: 56px;
+    position: relative;
+}
+/* The collapse ("<<") button is absolutely positioned inside the sidebar,
+   so the padding-top above doesn't move it - pin it explicitly instead. */
+section[data-testid="stSidebar"] [data-testid="stSidebarCollapseButton"],
+section[data-testid="stSidebar"] button[kind="headerNoPadding"],
+section[data-testid="stSidebar"] [data-testid="baseButton-headerNoPadding"] {
+    position: absolute !important;
+    top: 64px !important;
+    z-index: 1000002 !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+}
+section[data-testid="stSidebar"] [data-testid="stSidebarCollapseButton"] svg,
+section[data-testid="stSidebar"] button[kind="headerNoPadding"] svg {
+    fill: var(--text-primary) !important;
+    color: var(--text-primary) !important;
 }
 section[data-testid="stSidebar"] h1 {
     font-family: 'Fraunces', serif;
