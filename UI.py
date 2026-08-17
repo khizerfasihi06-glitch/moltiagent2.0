@@ -58,6 +58,7 @@ html, body, [class*="css"] {
 section[data-testid="stSidebar"] {
     background-color: var(--panel);
     border-right: 1px dashed var(--border);
+    padding-top: 56px;
 }
 section[data-testid="stSidebar"] h1 {
     font-family: 'Fraunces', serif;
@@ -227,15 +228,17 @@ section[data-testid="stSidebar"] label {
     transform-origin: center bottom;
 }
 
-/* push page content below the fixed navbar */
+/* push page content below the fixed navbar + Streamlit's own header row */
 div[data-testid="stAppViewContainer"] > .main {
-    padding-top: 56px;
+    padding-top: 104px;
 }
 header[data-testid="stHeader"] {
     background: transparent;
+    position: fixed;
+    top: 56px;
 }
 
-/* Keep the mobile sidebar toggle (">>") clickable above the fixed navbar */
+/* Keep the mobile sidebar toggle (">>") clickable, pushed below the navbar */
 [data-testid="stSidebarCollapsedControl"],
 [data-testid="stSidebarCollapseButton"],
 [data-testid="baseButton-headerNoPadding"] {
