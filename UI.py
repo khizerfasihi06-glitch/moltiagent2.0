@@ -7,9 +7,14 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_mistralai import ChatMistralAI
 
 
-st.set_page_config(page_title="Boarding: AI Experts", page_icon="", layout="centered")
+st.set_page_config(page_title="Boarding: AI Experts", page_icon="🎫", layout="centered")
 
-
+# ---------------------------------------------------------------------------
+# Design system: "Boarding Pass"
+# Picking a persona = boarding a flight into that expert's world. The header
+# renders as a literal ticket stub with a channel number, a torn-perforation
+# divider, and a rotated stamp. Everything else stays quiet around it.
+# ---------------------------------------------------------------------------
 DESIGN_CSS = """
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap');
@@ -208,6 +213,33 @@ div[data-testid="stChatMessage"] {
     padding: 0.6rem 0.4rem;
     margin-bottom: 0.6rem;
 }
+div[data-testid="stChatMessage"] p,
+div[data-testid="stChatMessage"] li,
+div[data-testid="stChatMessage"] span,
+div[data-testid="stChatMessage"] div,
+div[data-testid="stChatMessage"] .stMarkdown {
+    color: var(--text-primary) !important;
+}
+div[data-testid="stChatMessage"] code {
+    color: var(--marigold) !important;
+    background-color: rgba(245, 166, 35, 0.12) !important;
+}
+
+/* Chat input text */
+[data-testid="stChatInput"] textarea {
+    color: var(--text-primary) !important;
+}
+[data-testid="stChatInput"] textarea::placeholder {
+    color: var(--text-muted) !important;
+    opacity: 1;
+}
+
+/* Any other body / markdown text in the main area */
+div[data-testid="stAppViewContainer"] .stMarkdown p,
+div[data-testid="stAppViewContainer"] .stMarkdown li,
+div[data-testid="stAppViewContainer"] .stMarkdown span {
+    color: var(--text-primary);
+}
 
 /* Buttons -> ticket-pill style */
 .stButton > button, .stDownloadButton > button {
@@ -250,7 +282,7 @@ st.markdown(DESIGN_CSS, unsafe_allow_html=True)
 st.markdown(
     """
     <div class="topnav">
-        <span class="topnav-brand">Multi AI Avatar</span>
+        <span class="topnav-brand">🎫 Expert Boarding</span>
         <span class="topnav-status">Now Boarding</span>
     </div>
     """,
@@ -260,22 +292,26 @@ st.markdown(
 if os.path.exists("Image.png"):
     st.image("Image.png", width=150)
 
-
+# Mistral API key
+# SECURITY NOTE: don't hardcode secrets in source. Set MISTRAL_API_KEY as a real
+# environment variable, or put it in .streamlit/secrets.toml as:
+#   MISTRAL_API_KEY = "your-key-here"
+# and it'll be picked up automatically below.
 if "MISTRAL_API_KEY" not in os.environ:
     try:
         os.environ["MISTRAL_API_KEY"] = "fE2OLrga4hpKHkGXCn8n5Ck35wCwIq0L"
     except Exception:
         st.error(
             "MISTRAL_API_KEY is not set. Add it to your environment or "
-            ".streamlit/secrets.toml before running.")
-    
+            ".streamlit/secrets.toml before running."
+        )
         st.stop()
 
 
 # Model factory (cached)
 @st.cache_resource
 def get_model():
-    
+    # adjust model name / temperature if needed
     return ChatMistralAI(model="mistral-small-2506", temperature=0.9)
 
 
