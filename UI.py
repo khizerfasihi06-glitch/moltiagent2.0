@@ -42,7 +42,7 @@ st.sidebar.title("Chat Setting")
 persona_options = [
     "Amazon",
     "Arabic",
-    "Web Design (HTML/CSS)",
+    "Web Stack Development",
     "Astronomy & Space Exploration",
     "BS in Cloud Computing, AI, Robotics, Cyber Security, and Data Science",
     "Calculus",
@@ -196,19 +196,37 @@ PERSONA_CONFIGS = {
         "system_prompt": "You are an Amazon ecosystem expert AI. Offer clear, step-by-step guidance on AWS cloud infrastructure and Amazon Seller strategies.",
         "spinner": "Optimizing listings and servers...",
     },
-    "Web Design (HTML/CSS)": {
-        "title": "Web Design Studio AI",
-        "subtitle": "Describe a page and get ready-to-use HTML/CSS.",
-        "input_placeholder": "Describe the web page or component you want (e.g. 'a pricing page with 3 tiers')...",
+    "Web Stack Development": {
+        "title": "Full-Stack Dev Studio AI",
+        "subtitle": "Frontend, backend, databases, and deployment — end to end.",
+        "input_placeholder": "Describe the app or feature you want (e.g. 'a login page with a Node/Express + MongoDB backend')...",
         "system_prompt": (
-            "You are an expert front-end web designer AI. When the user asks for a page, "
-            "component, or layout, respond with a SINGLE complete, self-contained HTML "
-            "document (including inline <style> CSS, and inline <script> JS if needed) "
-            "inside one ```html code block. Use modern, clean design. Do not split the "
-            "code across multiple blocks. After the code block you may add a short plain-"
-            "text explanation of the design choices."
+            "You are an expert full-stack web development AI, covering the entire "
+            "web stack: frontend (HTML, CSS, JavaScript/TypeScript, and frameworks "
+            "like React, Vue, or Svelte), backend (Node.js/Express, Python/Flask or "
+            "Django, PHP, etc.), databases (SQL and NoSQL: PostgreSQL, MySQL, "
+            "MongoDB, etc.), REST/GraphQL APIs, authentication, and basic deployment "
+            "or DevOps guidance (Docker, environment variables, hosting).\n\n"
+            "When the user asks for an app or feature:\n"
+            "- Break the solution into the files it actually needs (e.g. index.html, "
+            "styles.css, script.js, server.js, routes/*.js, models/*.py, schema.sql, "
+            "requirements.txt, Dockerfile, .env.example), instead of forcing "
+            "everything into one file.\n"
+            "- Put each file's contents in its own fenced code block, tagged with "
+            "the correct language (```html, ```css, ```javascript, ```python, "
+            "```sql, ```bash, ```json, ```yaml, etc.), and start that block with a "
+            "one-line comment naming the file it belongs to (e.g. `// server.js`).\n"
+            "- If the request is small and purely front-end (a single static page or "
+            "component with no backend), a single self-contained HTML file with "
+            "inline <style>/<script> is fine.\n"
+            "- After the code blocks, briefly explain the architecture, how the "
+            "pieces connect, how to install dependencies and run the project, and "
+            "call out important security or scalability considerations (input "
+            "validation, secrets management, SQL injection, CORS, etc.).\n"
+            "- Prefer modern, widely-used, well-documented tools and clean, "
+            "production-quality code over exotic or deprecated approaches."
         ),
-        "spinner": "Sketching the layout...",
+        "spinner": "Wiring up the stack...",
     },
     # add other specific configs as you prefer...
 }
@@ -255,12 +273,16 @@ LANG_TO_FILE = {
     "css": (".css", "text/css"),
     "javascript": (".js", "application/javascript"),
     "js": (".js", "application/javascript"),
+    "typescript": (".ts", "application/typescript"),
+    "ts": (".ts", "application/typescript"),
     "json": (".json", "application/json"),
     "sql": (".sql", "text/plain"),
     "bash": (".sh", "text/x-sh"),
     "sh": (".sh", "text/x-sh"),
     "yaml": (".yaml", "text/yaml"),
     "yml": (".yaml", "text/yaml"),
+    "dockerfile": ("Dockerfile", "text/plain"),
+    "php": (".php", "application/x-httpd-php"),
     "txt": (".txt", "text/plain"),
 }
 
@@ -317,7 +339,7 @@ def render_code_tools(lang: str, code: str, key_suffix: str) -> None:
     """Show a live HTML preview (if applicable) and download buttons (native
     format + PDF) for a code block."""
     ext, mime = LANG_TO_FILE.get(lang, (".txt", "text/plain"))
-    file_name = f"generated{ext}"
+    file_name = ext if ext == "Dockerfile" else f"generated{ext}"
 
     if lang == "html":
         with st.expander("🌐 Preview generated page", expanded=True):
