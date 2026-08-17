@@ -7,7 +7,7 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_mistralai import ChatMistralAI
 
 
-st.set_page_config(page_title="Avatar AI", page_icon="🔥", layout="centered")
+st.set_page_config(page_title="Boarding: AI Experts", page_icon="🎫", layout="centered")
 
 # ---------------------------------------------------------------------------
 # Design system: "Boarding Pass"
@@ -19,30 +19,30 @@ DESIGN_CSS = """
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap');
 
+/* Theme source of truth: Streamlit's OWN live CSS variables
+   (--background-color, --secondary-background-color, --text-color), which
+   it updates automatically based on the in-app Settings -> theme choice
+   (Light / Dark / a custom theme) - NOT the OS's prefers-color-scheme.
+   Each var() below falls back to our original dark palette so nothing
+   breaks if an older Streamlit build doesn't expose these variables.
+   --ink, --marigold, --coral stay fixed on purpose: they're always the
+   dark text sitting on the gold stub/navbar, regardless of theme. */
 :root {
     --ink: #1B1230;
-    --bg-app: #1B1230;
-    --panel: #241A3D;
-    --panel-2: #2C2049;
     --marigold: #F5A623;
     --coral: #FF5F87;
-    --text-primary: #F5F1FA;
-    --text-muted: #A79BC4;
-    --border: #3A2C5A;
-}
 
-/* Light mode: swap backgrounds + text so contrast stays correct.
-   --ink, --marigold, --coral stay fixed (they're always the dark text
-   sitting on the gold stub/navbar, regardless of mode). */
-@media (prefers-color-scheme: light) {
-    :root {
-        --bg-app: #FBF7F0;
-        --panel: #FFFFFF;
-        --panel-2: #FFF3DE;
-        --text-primary: #1B1230;
-        --text-muted: #6B5E86;
-        --border: #E8D9BE;
-    }
+    --bg-app: var(--background-color, #1B1230);
+    --panel: var(--secondary-background-color, #241A3D);
+    --text-primary: var(--text-color, #F5F1FA);
+
+    /* Streamlit doesn't expose a third background shade or a "muted text"
+       token, so derive them by mixing its live variables with our accent -
+       these recompute automatically whenever --background-color /
+       --text-color change. */
+    --panel-2: color-mix(in srgb, var(--panel) 85%, var(--marigold) 15%);
+    --text-muted: color-mix(in srgb, var(--text-primary) 65%, var(--bg-app) 35%);
+    --border: color-mix(in srgb, var(--text-primary) 18%, var(--bg-app) 82%);
 }
 
 html, body, [class*="css"] {
@@ -331,8 +331,8 @@ st.markdown(DESIGN_CSS, unsafe_allow_html=True)
 st.markdown(
     """
     <div class="topnav">
-        <span class="topnav-brand"><span class="fire-emoji">🔥</span>Avatar/Fire</span>
-        <span class="topnav-status">Avatar uses their powered now you can use this power as word too.</span>
+        <span class="topnav-brand"><span class="fire-emoji">🔥</span> Expert Boarding</span>
+        <span class="topnav-status">Now Boarding</span>
     </div>
     """,
     unsafe_allow_html=True,
