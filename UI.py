@@ -9,12 +9,7 @@ from langchain_mistralai import ChatMistralAI
 
 st.set_page_config(page_title="Boarding: AI Experts", page_icon="🎫", layout="centered")
 
-# ---------------------------------------------------------------------------
-# Design system: "Boarding Pass"
-# Picking a persona = boarding a flight into that expert's world. The header
-# renders as a literal ticket stub with a channel number, a torn-perforation
-# divider, and a rotated stamp. Everything else stays quiet around it.
-# ---------------------------------------------------------------------------
+
 DESIGN_CSS = """
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap');
@@ -163,6 +158,48 @@ section[data-testid="stSidebar"] label {
     background: var(--text-muted);
 }
 
+/* ---------------- Top navbar ---------------- */
+.topnav {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 56px;
+    background: var(--marigold);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 1.6rem;
+    z-index: 999999;
+    box-shadow: 0 2px 14px rgba(0,0,0,0.35);
+}
+.topnav-brand {
+    font-family: 'Fraunces', serif;
+    font-weight: 700;
+    font-size: 1.15rem;
+    color: var(--ink);
+    letter-spacing: 0.01em;
+}
+.topnav-status {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink);
+    background: rgba(27, 18, 48, 0.12);
+    padding: 4px 10px;
+    border-radius: 999px;
+}
+
+/* push page content below the fixed navbar */
+div[data-testid="stAppViewContainer"] > .main {
+    padding-top: 56px;
+}
+header[data-testid="stHeader"] {
+    background: transparent;
+}
+
 /* Chat messages */
 div[data-testid="stChatMessage"] {
     background-color: var(--panel);
@@ -210,6 +247,15 @@ div[data-testid="stChatMessage"] {
 </style>
 """
 st.markdown(DESIGN_CSS, unsafe_allow_html=True)
+st.markdown(
+    """
+    <div class="topnav">
+        <span class="topnav-brand">🎫 Expert Boarding</span>
+        <span class="topnav-status">Now Boarding</span>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
 
 if os.path.exists("Image.png"):
     st.image("Image.png", width=150)
