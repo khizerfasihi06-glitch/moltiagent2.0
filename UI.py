@@ -62,7 +62,7 @@ html, body, [class*="css"] {
 }
 @media (prefers-reduced-motion: reduce) {
     .stApp, section[data-testid="stSidebar"], .ticket, div[data-testid="stChatMessage"],
-    [data-testid="stFileUploaderDropzone"], [data-testid="stChatInput"], .fire-emoji {
+    [data-testid="stFileUploaderDropzone"], [data-testid="stChatInput"], .fire-emoji, .ticket-stub::before {
         transition: none !important;
         animation: none !important;
     }
@@ -107,6 +107,28 @@ section[data-testid="stSidebar"] label {
     font-family: 'IBM Plex Mono', monospace;
     padding: 0.8rem 0.4rem;
     position: relative;
+    overflow: hidden;
+}
+.ticket-stub::before {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 130px;
+    height: 130px;
+    transform: translate(-50%, -50%) scale(0.9);
+    background: radial-gradient(circle, color-mix(in srgb, #FFFFFF 55%, transparent) 0%, transparent 70%);
+    pointer-events: none;
+    animation: spotlight-pulse 2.6s ease-in-out infinite;
+}
+.ticket-stub .no-label,
+.ticket-stub .no-value {
+    position: relative;
+    z-index: 1;
+}
+@keyframes spotlight-pulse {
+    0%, 100% { opacity: 0.5; transform: translate(-50%, -50%) scale(0.88); }
+    50%      { opacity: 0.85; transform: translate(-50%, -50%) scale(1.05); }
 }
 .ticket-stub .no-label {
     font-size: 0.62rem;
