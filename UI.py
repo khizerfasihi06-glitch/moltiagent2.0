@@ -250,7 +250,7 @@ st.markdown(DESIGN_CSS, unsafe_allow_html=True)
 st.markdown(
     """
     <div class="topnav">
-        <span class="topnav-brand">🎫 Expert Boarding</span>
+        <span class="topnav-brand">Multi AI Avatar</span>
         <span class="topnav-status">Now Boarding</span>
     </div>
     """,
@@ -267,7 +267,7 @@ if "MISTRAL_API_KEY" not in os.environ:
     except Exception:
         st.error(
             "MISTRAL_API_KEY is not set. Add it to your environment or "
-            ".streamlit/secrets.toml before running."
+            ".streamlit/secrets.toml before running.")
     
         st.stop()
 
