@@ -73,10 +73,14 @@ section[data-testid="stSidebar"] {
     background-color: var(--panel);
     border-right: 1px dashed var(--border);
 }
-section[data-testid="stSidebar"] h1 {
+section[data-testid="stSidebar"] h1,
+section[data-testid="stSidebar"] h2,
+section[data-testid="stSidebar"] h3 {
     font-family: 'Fraunces', serif;
     font-weight: 700;
     letter-spacing: 0.01em;
+    color: var(--text-primary) !important;
+    opacity: 1 !important;
 }
 section[data-testid="stSidebar"] label {
     font-family: 'IBM Plex Mono', monospace;
@@ -348,6 +352,15 @@ div[data-testid="stAppViewContainer"] .stMarkdown span {
     border: 1px solid var(--border);
     border-radius: 10px;
     background-color: var(--marigold);
+}
+/* The inner textarea can carry its own native browser border/outline that
+   stacks visually with the container border above, producing a double ring.
+   Reset it explicitly so our container border is the only one shown. */
+[data-testid="stChatInput"] textarea,
+[data-testid="stChatInput"] > div {
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
 }
 
 /* Send button icon inside the chat input was hardcoded black - force it to
