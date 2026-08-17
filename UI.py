@@ -7,9 +7,14 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_mistralai import ChatMistralAI
 
 
-st.set_page_config(page_title="Multi AI Experts", page_icon="🔥", layout="centered")
+st.set_page_config(page_title="Boarding: AI Experts", page_icon="🎫", layout="centered")
 
-
+# ---------------------------------------------------------------------------
+# Design system: "Boarding Pass"
+# Picking a persona = boarding a flight into that expert's world. The header
+# renders as a literal ticket stub with a channel number, a torn-perforation
+# divider, and a rotated stamp. Everything else stays quiet around it.
+# ---------------------------------------------------------------------------
 DESIGN_CSS = """
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap');
@@ -292,8 +297,8 @@ st.markdown(DESIGN_CSS, unsafe_allow_html=True)
 st.markdown(
     """
     <div class="topnav">
-        <span class="topnav-brand">🔥  Avatar/Fire</span>
-        <span class="topnav-status">Multi Avatar to give you Answers</span>
+        <span class="topnav-brand">🎫 Expert Boarding</span>
+        <span class="topnav-status">Now Boarding</span>
     </div>
     """,
     unsafe_allow_html=True,
@@ -497,28 +502,28 @@ PERSONA_CONFIGS = {
         "input_placeholder": "Describe the app or feature you want (e.g. 'a login page with a Node/Express + MongoDB backend')...",
         "system_prompt": (
             "You are an expert full-stack web development AI, covering the entire "
-            "web stack: frontend (HTML, CSS, JavaScript/TypeScript, and frameworks "
-            "like React, Vue, or Svelte), backend (Node.js/Express, Python/Flask or "
-            "Django, PHP, etc.), databases (SQL and NoSQL: PostgreSQL, MySQL, "
-            "MongoDB, etc.), REST/GraphQL APIs, authentication, and basic deployment "
-            "or DevOps guidance (Docker, environment variables, hosting).\n\n"
-            "When the user asks for an app or feature:\n"
-            "- Break the solution into the files it actually needs (e.g. index.html, "
-            "styles.css, script.js, server.js, routes/*.js, models/*.py, schema.sql, "
-            "requirements.txt, Dockerfile, .env.example), instead of forcing "
-            "everything into one file.\n"
-            "- Put each file's contents in its own fenced code block, tagged with "
-            "the correct language (```html, ```css, ```javascript, ```python, "
-            "```sql, ```bash, ```json, ```yaml, etc.), and start that block with a "
-            "one-line comment naming the file it belongs to (e.g. `// server.js`).\n"
-            "- If the request is small and purely front-end (a single static page or "
-            "component with no backend), a single self-contained HTML file with "
-            "inline <style>/<script> is fine.\n"
-            "- After the code blocks, briefly explain the architecture, how the "
+            "web stack: frontend (HTML, CSS, JavaScript), backend (Node.js/Express, "
+            "Python/Flask or Django, PHP, etc.), databases (SQL and NoSQL: "
+            "PostgreSQL, MySQL, MongoDB, etc.), REST/GraphQL APIs, authentication, "
+            "and basic deployment or DevOps guidance (Docker, environment "
+            "variables, hosting).\n\n"
+            "FRONTEND RULE: always combine the HTML, CSS, and JavaScript into ONE "
+            "single self-contained ```html code block — inline <style> for CSS and "
+            "inline <script> for JS in the same file, never split across separate "
+            "html/css/js blocks. This applies whether the frontend is standalone or "
+            "paired with a backend.\n\n"
+            "BACKEND/DATABASE RULE: if the request needs a backend or database, put "
+            "those in their own separate fenced code blocks (e.g. server.js, "
+            "routes/*.js, models/*.py, schema.sql, requirements.txt, Dockerfile, "
+            ".env.example), each tagged with the correct language and starting with "
+            "a one-line comment naming the file (e.g. `// server.js`), and explain "
+            "how the single-page frontend calls those backend endpoints (fetch/axios "
+            "URLs, ports, etc.).\n\n"
+            "After the code blocks, briefly explain the architecture, how the "
             "pieces connect, how to install dependencies and run the project, and "
             "call out important security or scalability considerations (input "
-            "validation, secrets management, SQL injection, CORS, etc.).\n"
-            "- Prefer modern, widely-used, well-documented tools and clean, "
+            "validation, secrets management, SQL injection, CORS, etc.). Prefer "
+            "modern, widely-used, well-documented tools and clean, "
             "production-quality code over exotic or deprecated approaches."
         ),
         "spinner": "Wiring up the stack...",
