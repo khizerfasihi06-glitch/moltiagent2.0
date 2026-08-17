@@ -7,7 +7,7 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_mistralai import ChatMistralAI
 
 
-st.set_page_config(page_title="Boarding: AI Experts", page_icon="", layout="centered")
+st.set_page_config(page_title="Boarding: AI Experts", page_icon="🔥", layout="centered")
 
 
 DESIGN_CSS = """
@@ -292,7 +292,7 @@ st.markdown(DESIGN_CSS, unsafe_allow_html=True)
 st.markdown(
     """
     <div class="topnav">
-        <span class="topnav-brand">Avatar/span>
+        <span class="topnav-brand">🔥  Avatar/Fire</span>
         <span class="topnav-status">Multi Avatar to give you Answers</span>
     </div>
     """,
