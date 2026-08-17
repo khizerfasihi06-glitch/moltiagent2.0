@@ -212,6 +212,21 @@ section[data-testid="stSidebar"] label {
     border-radius: 999px;
 }
 
+/* Flickering fire emoji */
+@keyframes fire-flicker {
+    0%   { transform: scale(1) rotate(-2deg);   opacity: 1;    filter: drop-shadow(0 0 0px #FF9A3C); }
+    20%  { transform: scale(1.08) rotate(3deg); opacity: 0.9;  filter: drop-shadow(0 0 4px #FF9A3C); }
+    40%  { transform: scale(0.96) rotate(-4deg);opacity: 1;    filter: drop-shadow(0 0 2px #FF9A3C); }
+    60%  { transform: scale(1.1) rotate(2deg);  opacity: 0.85; filter: drop-shadow(0 0 6px #FF9A3C); }
+    80%  { transform: scale(0.98) rotate(-3deg);opacity: 1;    filter: drop-shadow(0 0 3px #FF9A3C); }
+    100% { transform: scale(1) rotate(-2deg);   opacity: 1;    filter: drop-shadow(0 0 0px #FF9A3C); }
+}
+.fire-emoji {
+    display: inline-block;
+    animation: fire-flicker 1.4s infinite ease-in-out;
+    transform-origin: center bottom;
+}
+
 /* push page content below the fixed navbar */
 div[data-testid="stAppViewContainer"] > .main {
     padding-top: 56px;
@@ -297,7 +312,7 @@ st.markdown(DESIGN_CSS, unsafe_allow_html=True)
 st.markdown(
     """
     <div class="topnav">
-        <span class="topnav-brand">🎫 Expert Boarding</span>
+        <span class="topnav-brand"><span class="fire-emoji">🔥</span> Expert Boarding</span>
         <span class="topnav-status">Now Boarding</span>
     </div>
     """,
