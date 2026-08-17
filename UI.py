@@ -252,6 +252,28 @@ header[data-testid="stHeader"] {
     z-index: 999997;
 }
 
+/* Header toolbar icons (GitHub / Share / "..." menu) were invisible: dark
+   SVGs on a dark background. Force them to use the theme's text color. */
+header[data-testid="stHeader"] svg,
+[data-testid="stToolbar"] svg,
+[data-testid="stToolbarActions"] svg,
+[data-testid="stDeployButton"] svg,
+[data-testid="stStatusWidget"] svg {
+    fill: var(--text-primary) !important;
+    color: var(--text-primary) !important;
+    opacity: 1 !important;
+}
+header[data-testid="stHeader"] button,
+[data-testid="stToolbar"] button,
+[data-testid="stToolbarActions"] button,
+[data-testid="stDeployButton"] button {
+    color: var(--text-primary) !important;
+}
+header[data-testid="stHeader"] button:hover svg {
+    fill: var(--marigold) !important;
+    color: var(--marigold) !important;
+}
+
 /* Chat messages */
 div[data-testid="stChatMessage"] {
     background-color: var(--panel);
