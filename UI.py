@@ -288,6 +288,7 @@ LANG_TO_FILE = {
 
 
 
+@st.cache_data(show_spinner=False)
 def generate_pdf_bytes(text: str, title: str | None = None, monospace: bool = False) -> bytes:
     """Render plain text (chat reply or code block) into a downloadable PDF and
     return the raw bytes, using matplotlib's built-in PDF backend -- no
