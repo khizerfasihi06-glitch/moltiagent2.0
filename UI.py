@@ -7,7 +7,7 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_mistralai import ChatMistralAI
 
 
-st.set_page_config(page_title="Boarding: AI Experts", page_icon="🎫", layout="centered")
+st.set_page_config(page_title="Avatar AI", page_icon="🎫", layout="centered")
 
 # ---------------------------------------------------------------------------
 # Design system: "Boarding Pass"
@@ -312,8 +312,8 @@ st.markdown(DESIGN_CSS, unsafe_allow_html=True)
 st.markdown(
     """
     <div class="topnav">
-        <span class="topnav-brand"><span class="fire-emoji">🔥</span> Expert Boarding</span>
-        <span class="topnav-status">Now Boarding</span>
+        <span class="topnav-brand"><span class="fire-emoji">🔥</span> Avatar/Fire</span>
+        <span class="topnav-status">Multi  AI</span>
     </div>
     """,
     unsafe_allow_html=True,
