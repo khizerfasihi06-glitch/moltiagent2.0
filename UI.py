@@ -7,7 +7,7 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_mistralai import ChatMistralAI
 
 
-st.set_page_config(page_title="Avatar AI", page_icon="🎫", layout="centered")
+st.set_page_config(page_title="Boarding: AI Experts", page_icon="🎫", layout="centered")
 
 # ---------------------------------------------------------------------------
 # Design system: "Boarding Pass"
@@ -235,6 +235,20 @@ header[data-testid="stHeader"] {
     background: transparent;
 }
 
+/* Keep the mobile sidebar toggle (">>") clickable above the fixed navbar */
+[data-testid="stSidebarCollapsedControl"],
+[data-testid="stSidebarCollapseButton"],
+[data-testid="baseButton-headerNoPadding"] {
+    z-index: 1000001 !important;
+    position: relative;
+}
+header[data-testid="stHeader"] {
+    z-index: 1000001 !important;
+}
+.topnav {
+    z-index: 999997;
+}
+
 /* Chat messages */
 div[data-testid="stChatMessage"] {
     background-color: var(--panel);
@@ -312,8 +326,8 @@ st.markdown(DESIGN_CSS, unsafe_allow_html=True)
 st.markdown(
     """
     <div class="topnav">
-        <span class="topnav-brand"><span class="fire-emoji">🔥</span> Avatar/Fire</span>
-        <span class="topnav-status">Multi  AI</span>
+        <span class="topnav-brand"><span class="fire-emoji">🔥</span> Expert Boarding</span>
+        <span class="topnav-status">Now Boarding</span>
     </div>
     """,
     unsafe_allow_html=True,
