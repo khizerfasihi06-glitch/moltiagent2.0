@@ -297,8 +297,8 @@ st.markdown(DESIGN_CSS, unsafe_allow_html=True)
 st.markdown(
     """
     <div class="topnav">
-        <span class="topnav-brand">🎫 Expert Boarding</span>
-        <span class="topnav-status">Now Boarding</span>
+        <span class="topnav-brand">Avatar/span>
+        <span class="topnav-status">Multi Avatar to give you Answers</span>
     </div>
     """,
     unsafe_allow_html=True,
