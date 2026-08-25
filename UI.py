@@ -450,7 +450,7 @@ if os.path.exists("water.png"):
 if "MISTRAL_API_KEY" not in os.environ:
     # Try Streamlit secrets first (recommended), then bail out with a clear error.
     try:
-        os.environ["MISTRAL_API_KEY"] = st.secrets["MISTRAL_API_KEY"]
+        os.environ["MISTRAL_API_KEY"] = "104GgcoCq2GXWIsooV185KvvNBgVBdcg"
     except Exception:
         st.error(
             "MISTRAL_API_KEY is not set. Add it to your environment or "
