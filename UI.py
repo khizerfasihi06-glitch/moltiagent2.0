@@ -4,7 +4,9 @@ import re
 import streamlit as st
 import streamlit.components.v1 as components
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
-from langchain_mistralai import ChatMistralAI
+from langchain_mistralai import ChatMistralAI, MistralAIEmbeddings
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_community.vectorstores import FAISS
 
 
 st.set_page_config(page_title=" Avatar AI Experts", page_icon="💧", layout="centered")
@@ -402,6 +404,28 @@ div[data-baseweb="select"]:focus-within {
 [data-testid="stChatInput"]:focus-within {
     box-shadow: 0 0 0 2px var(--marigold) !important;
 }
+
+/* ---------------- RAG status pill ---------------- */
+.rag-status {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.72rem;
+    letter-spacing: 0.05em;
+    color: var(--marigold);
+    background: color-mix(in srgb, var(--marigold) 14%, transparent);
+    border: 1px dashed var(--marigold);
+    border-radius: 8px;
+    padding: 0.35rem 0.6rem;
+    margin-top: 0.4rem;
+}
+.rag-chunk {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    border-left: 2px solid var(--marigold);
+    padding: 0.25rem 0.6rem;
+    margin-bottom: 0.4rem;
+    white-space: pre-wrap;
+}
 </style>
 """
 st.markdown(DESIGN_CSS, unsafe_allow_html=True)
@@ -424,8 +448,9 @@ if os.path.exists("water.png"):
 #   MISTRAL_API_KEY = "your-key-here"
 # and it'll be picked up automatically below.
 if "MISTRAL_API_KEY" not in os.environ:
+    # Try Streamlit secrets first (recommended), then bail out with a clear error.
     try:
-        os.environ["MISTRAL_API_KEY"] = "fE2OLrga4hpKHkGXCn8n5Ck35wCwIq0L"
+        os.environ["MISTRAL_API_KEY"] = st.secrets["MISTRAL_API_KEY"]
     except Exception:
         st.error(
             "MISTRAL_API_KEY is not set. Add it to your environment or "
@@ -441,7 +466,13 @@ def get_model():
     return ChatMistralAI(model="mistral-small-2506", temperature=0.9)
 
 
+@st.cache_resource
+def get_embeddings():
+    return MistralAIEmbeddings(model="mistral-embed")
+
+
 model = get_model()
+embeddings = get_embeddings()
 
 st.sidebar.markdown(
     "<span style='font-family:IBM Plex Mono, monospace; font-size:0.75rem; "
@@ -512,14 +543,20 @@ persona = st.sidebar.selectbox(
 )
 
 st.sidebar.markdown("---")
-st.sidebar.title("Reference Document")
+st.sidebar.title("Reference Document (RAG)")
 
 uploaded_file = st.sidebar.file_uploader(
     "Upload a text document or paper context:",
     type=["txt", "pdf", "py", "csv", "json"],
 )
 
-MAX_DOC_CHARS = 20_000  # keep the system prompt from ballooning / blowing the context window
+with st.sidebar.expander("RAG settings", expanded=False):
+    chunk_size = st.slider("Chunk size (characters)", 300, 2000, 800, step=100)
+    chunk_overlap = st.slider("Chunk overlap (characters)", 0, 400, 120, step=20)
+    top_k = st.slider("Chunks retrieved per question", 1, 8, 4)
+    show_retrieved = st.checkbox("Show retrieved chunks under each reply", value=False)
+
+MAX_DOC_CHARS = 300_000  # sanity ceiling on raw text before chunking/embedding
 
 
 def extract_pdf_text(raw_bytes: bytes) -> str:
@@ -548,29 +585,85 @@ def extract_pdf_text(raw_bytes: bytes) -> str:
                 os.remove(p)
 
 
-document_context = ""
+@st.cache_resource(show_spinner=False)
+def build_vector_store(doc_text: str, chunk_size: int, chunk_overlap: int, doc_name: str):
+    """Split doc_text into overlapping chunks, embed them, and build a FAISS
+    index. Cached on (doc_text, chunk_size, chunk_overlap, doc_name) so it
+    only re-runs when the document or chunking params actually change.
+    Returns (vector_store, num_chunks).
+    """
+    splitter = RecursiveCharacterTextSplitter(
+        chunk_size=chunk_size,
+        chunk_overlap=chunk_overlap,
+        separators=["\n\n", "\n", ". ", " ", ""],
+    )
+    chunks = splitter.split_text(doc_text)
+    if not chunks:
+        return None, 0
+
+    vector_store = FAISS.from_texts(
+        chunks,
+        embedding=embeddings,
+        metadatas=[{"source": doc_name, "chunk_index": i} for i in range(len(chunks))],
+    )
+    return vector_store, len(chunks)
+
+
+def retrieve_context(query: str, k: int) -> list[str]:
+    """Return the top-k most relevant chunks for `query` from the current
+    session's vector store, or [] if no document is indexed."""
+    vector_store = st.session_state.get("vector_store")
+    if vector_store is None:
+        return []
+    try:
+        docs = vector_store.similarity_search(query, k=k)
+        return [d.page_content for d in docs]
+    except Exception as e:
+        st.warning(f"Retrieval error: {e}")
+        return []
+
+
+raw_document_text = ""
 if uploaded_file is not None:
     try:
         raw = uploaded_file.getvalue()
 
         if uploaded_file.name.lower().endswith(".pdf"):
-            document_context = extract_pdf_text(raw)
+            raw_document_text = extract_pdf_text(raw)
         else:
             # Text-like files: txt, py, csv, json
             try:
-                document_context = raw.decode("utf-8")
+                raw_document_text = raw.decode("utf-8")
             except UnicodeDecodeError:
-                document_context = raw.decode("utf-8", errors="replace")
+                raw_document_text = raw.decode("utf-8", errors="replace")
 
-        if len(document_context) > MAX_DOC_CHARS:
-            document_context = (
-                document_context[:MAX_DOC_CHARS]
-                + f"\n\n[... truncated, {len(document_context) - MAX_DOC_CHARS} more characters omitted ...]"
+        if len(raw_document_text) > MAX_DOC_CHARS:
+            raw_document_text = raw_document_text[:MAX_DOC_CHARS]
+
+        with st.sidebar.status("Indexing document for RAG...", expanded=False) as status:
+            vector_store, n_chunks = build_vector_store(
+                raw_document_text, chunk_size, chunk_overlap, uploaded_file.name
+            )
+            st.session_state.vector_store = vector_store
+            st.session_state.indexed_doc_name = uploaded_file.name
+            st.session_state.indexed_chunk_count = n_chunks
+            status.update(
+                label=f"Indexed {n_chunks} chunks from {uploaded_file.name}",
+                state="complete",
             )
 
-        st.sidebar.success(f"Loaded: {uploaded_file.name} ({len(document_context)} characters)")
+        st.sidebar.markdown(
+            f'<div class="rag-status">📚 RAG active — {n_chunks} chunks · '
+            f'top-{top_k} retrieved per question</div>',
+            unsafe_allow_html=True,
+        )
     except Exception as e:
-        st.sidebar.error("Error reading file: " + str(e))
+        st.sidebar.error("Error reading/indexing file: " + str(e))
+        st.session_state.vector_store = None
+else:
+    st.session_state.vector_store = None
+    st.session_state.indexed_doc_name = None
+    st.session_state.indexed_chunk_count = 0
 
 
 PERSONA_CONFIGS = {
@@ -698,7 +791,6 @@ LANG_TO_FILE = {
 }
 
 
-
 @st.cache_data(show_spinner=False)
 def generate_pdf_bytes(text: str, title: str | None = None, monospace: bool = False) -> bytes:
     """Render plain text (chat reply or code block) into a downloadable PDF and
@@ -789,19 +881,35 @@ def render_message_pdf_button(content: str, key_suffix: str) -> None:
     )
 
 
+def render_retrieved_chunks(chunks: list[str], key_suffix: str) -> None:
+    """Optionally show which chunks were pulled from the vector store for
+    a given question, for transparency/debugging."""
+    if not chunks:
+        return
+    with st.expander(f"📚 Retrieved context ({len(chunks)} chunks)", expanded=False):
+        for i, chunk in enumerate(chunks):
+            st.markdown(
+                f'<div class="rag-chunk">[{i+1}] {chunk[:600]}{"..." if len(chunk) > 600 else ""}</div>',
+                unsafe_allow_html=True,
+            )
+
+
 USER_AVATAR = "💧"
 ASSISTANT_AVATAR = "💧"
 
 
 current_config = PERSONA_CONFIGS.get(persona, make_default_config(persona))
 
-# Build final system prompt including uploaded document context if present
-final_system_prompt = current_config["system_prompt"]
-if document_context:
-    final_system_prompt += (
-        "\n\n[Context Document]\nThe user has provided the following reference document to help you answer questions:\n"
-        + document_context
-        + "\n[END OF CONTEXT DOCUMENT]\n"
+# Base system prompt for the persona. RAG context is now injected per-turn
+# (as retrieved chunks) rather than dumped whole into the system prompt.
+base_system_prompt = current_config["system_prompt"]
+if st.session_state.get("vector_store") is not None:
+    base_system_prompt += (
+        "\n\nYou have access to a reference document via retrieval. Relevant "
+        "excerpts will be provided before each user question inside "
+        "[Retrieved Context] tags. Ground your answer in that context when it's "
+        "relevant, and say so if the context doesn't cover what's being asked. "
+        "Don't mention 'chunks' or the retrieval mechanism itself to the user."
     )
 
 # Initialize / reset session state when persona or uploaded doc changes
@@ -816,7 +924,12 @@ needs_reset = (
 if needs_reset:
     st.session_state.current_persona = persona
     st.session_state.last_doc_name = current_doc_name
-    st.session_state.messages = [SystemMessage(content=final_system_prompt)]
+    st.session_state.messages = [SystemMessage(content=base_system_prompt)]
+else:
+    # Keep the system message in sync (e.g. RAG availability toggled) without
+    # wiping conversation history.
+    if st.session_state.messages and isinstance(st.session_state.messages[0], SystemMessage):
+        st.session_state.messages[0] = SystemMessage(content=base_system_prompt)
 
 try:
     channel_no = f"{persona_options.index(persona) + 1:03d}"
@@ -852,7 +965,7 @@ st.markdown(
 )
 
 if st.sidebar.button("Clear Chat History"):
-    st.session_state.messages = [SystemMessage(content=final_system_prompt)]
+    st.session_state.messages = [SystemMessage(content=base_system_prompt)]
 
 # Render chat history
 for idx, msg in enumerate(st.session_state.messages):
@@ -871,15 +984,36 @@ for idx, msg in enumerate(st.session_state.messages):
 if user_input := st.chat_input(current_config["input_placeholder"]):
     with st.chat_message("user", avatar=USER_AVATAR):
         st.write(user_input)
+
+    # --- RAG retrieval step ---
+    retrieved_chunks = retrieve_context(user_input, k=top_k)
+
+    if retrieved_chunks:
+        context_block = "\n\n---\n\n".join(retrieved_chunks)
+        augmented_user_content = (
+            f"[Retrieved Context]\n{context_block}\n[END Retrieved Context]\n\n"
+            f"User question: {user_input}"
+        )
+    else:
+        augmented_user_content = user_input
+
+    # Keep the visible/history message clean (just what the user typed),
+    # but send the retrieval-augmented version to the model for this turn.
     st.session_state.messages.append(HumanMessage(content=user_input))
+    messages_for_model = st.session_state.messages[:-1] + [
+        HumanMessage(content=augmented_user_content)
+    ]
 
     with st.chat_message("assistant", avatar=ASSISTANT_AVATAR):
         with st.spinner(current_config.get("spinner", "Thinking...")):
             try:
-                response = model.invoke(st.session_state.messages)
+                response = model.invoke(messages_for_model)
                 content = getattr(response, "content", None) or str(response)
                 st.write(content)
                 st.session_state.messages.append(AIMessage(content=content))
+
+                if show_retrieved:
+                    render_retrieved_chunks(retrieved_chunks, key_suffix="latest")
 
                 render_message_pdf_button(content, key_suffix="latest")
                 for block_idx, (lang, code) in enumerate(extract_code_blocks(content)):
