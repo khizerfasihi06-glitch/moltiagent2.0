@@ -559,9 +559,20 @@ with st.sidebar.expander("RAG settings", expanded=False):
 MAX_DOC_CHARS = 300_000  # sanity ceiling on raw text before chunking/embedding
 
 
-def extract_pdf_text(raw_bytes: bytes) -> str:
-    """Extract text from a PDF's raw bytes using the poppler-utils `pdftotext`
-    command-line tool (no Python PDF library required)."""
+def _extract_pdf_text_pypdf(raw_bytes: bytes) -> str:
+    """Pure-Python PDF text extraction via pypdf. No system binary required,
+    so this works out of the box on Streamlit Community Cloud, Docker, etc."""
+    from pypdf import PdfReader
+
+    reader = PdfReader(io.BytesIO(raw_bytes))
+    pages_text = [page.extract_text() or "" for page in reader.pages]
+    return "\n\n".join(pages_text)
+
+
+def _extract_pdf_text_pdftotext(raw_bytes: bytes) -> str:
+    """Fallback extraction using the poppler-utils `pdftotext` CLI, if it
+    happens to be installed - sometimes gives cleaner layout-preserving text
+    than pypdf for complex/columned PDFs."""
     import subprocess
     import tempfile
 
@@ -583,6 +594,33 @@ def extract_pdf_text(raw_bytes: bytes) -> str:
         for p in (tmp_in_path, tmp_out_path):
             if os.path.exists(p):
                 os.remove(p)
+
+
+def extract_pdf_text(raw_bytes: bytes) -> str:
+    """Extract text from a PDF's raw bytes. Tries pypdf first (pure Python,
+    always available); falls back to the `pdftotext` CLI if pypdf yields
+    little/no text (e.g. a tricky layout) and the binary happens to be
+    installed. Raises if neither approach produces any text."""
+    text = ""
+    try:
+        text = _extract_pdf_text_pypdf(raw_bytes)
+    except Exception:
+        text = ""
+
+    if len(text.strip()) < 20:
+        try:
+            fallback_text = _extract_pdf_text_pdftotext(raw_bytes)
+            if len(fallback_text.strip()) > len(text.strip()):
+                text = fallback_text
+        except (FileNotFoundError, Exception):
+            pass  # pdftotext not installed or failed - stick with pypdf's result
+
+    if not text.strip():
+        raise ValueError(
+            "Could not extract any text from this PDF (it may be scanned "
+            "images without embedded text, which needs OCR)."
+        )
+    return text
 
 
 @st.cache_resource(show_spinner=False)
