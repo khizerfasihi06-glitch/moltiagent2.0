@@ -8,7 +8,7 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_mistralai import ChatMistralAI, MistralAIEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import FAISS
-from mistralai import Mistral
+from mistralai.client import MistralClient
 
 
 st.set_page_config(page_title=" Avatar AI Experts", page_icon="💧", layout="centered")
