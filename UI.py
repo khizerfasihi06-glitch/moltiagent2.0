@@ -1,14 +1,12 @@
 import os
 import io
 import re
-import base64
 import streamlit as st
 import streamlit.components.v1 as components
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_mistralai import ChatMistralAI, MistralAIEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import FAISS
-from mistralai import Mistral
 
 
 st.set_page_config(page_title=" Avatar AI Experts", page_icon="💧", layout="centered")
@@ -476,102 +474,6 @@ def get_embeddings():
 model = get_model()
 embeddings = get_embeddings()
 
-
-# ---------------------------------------------------------------------------
-# Mistral Image Studio (text-to-image + image-to-image)
-#
-# Mistral has no separate "/v1/images/generations" endpoint like OpenAI's
-# DALL-E. Instead, image generation is exposed as a built-in tool on the
-# Agents + Conversations API:
-#   1. Create an Agent with tools=[{"type": "image_generation"}]
-#   2. Start a Conversation with that agent, passing either a plain text
-#      prompt (text-to-image) or a text + image_url payload (image-to-image,
-#      i.e. "edit this reference image like so")
-#   3. The response contains one or more `tool_file` chunks with a file_id
-#   4. Download the actual PNG bytes via client.files.download(file_id=...)
-# ---------------------------------------------------------------------------
-@st.cache_resource
-def get_mistral_client() -> Mistral:
-    return Mistral(api_key=os.environ["MISTRAL_API_KEY"])
-
-
-@st.cache_resource
-def get_image_agent():
-    """Create (once per session) a Mistral agent with the built-in
-    image_generation tool enabled. Reused for both text-to-image and
-    image-to-image (edit) requests."""
-    client = get_mistral_client()
-    return client.beta.agents.create(
-        model="mistral-medium-latest",
-        name="Image Generation Agent",
-        description="Agent used to generate and edit images.",
-        instructions=(
-            "Use the image generation tool whenever the user asks you to "
-            "create or edit an image. If the user provides a reference "
-            "image along with edit instructions, generate a new image that "
-            "applies those edits to the reference image, preserving "
-            "everything the user didn't ask to change."
-        ),
-        tools=[{"type": "image_generation"}],
-        completion_args={"temperature": 0.3, "top_p": 0.95},
-    )
-
-
-def generate_image_with_mistral(
-    prompt: str,
-    reference_image_bytes: bytes | None = None,
-    mime_type: str = "image/png",
-) -> list[bytes]:
-    """Generate an image from text, or edit a reference image, via Mistral's
-    Agents + Conversations API. Returns a list of raw PNG image bytes
-    (normally just one). Raises RuntimeError/Exception on failure."""
-    client = get_mistral_client()
-    agent = get_image_agent()
-
-    if reference_image_bytes is not None:
-        b64_image = base64.b64encode(reference_image_bytes).decode("utf-8")
-        inputs = [
-            {
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": prompt},
-                    {
-                        "type": "image_url",
-                        "image_url": f"data:{mime_type};base64,{b64_image}",
-                    },
-                ],
-            }
-        ]
-    else:
-        inputs = prompt
-
-    response = client.beta.conversations.start(agent_id=agent.id, inputs=inputs)
-
-    images: list[bytes] = []
-    for output in getattr(response, "outputs", []) or []:
-        content = getattr(output, "content", None)
-        if not content:
-            continue
-        for chunk in content:
-            # Chunks may come back as objects or plain dicts depending on SDK version.
-            chunk_type = getattr(chunk, "type", None)
-            if chunk_type is None and isinstance(chunk, dict):
-                chunk_type = chunk.get("type")
-            if chunk_type == "tool_file":
-                file_id = getattr(chunk, "file_id", None)
-                if file_id is None and isinstance(chunk, dict):
-                    file_id = chunk.get("file_id")
-                if file_id:
-                    images.append(client.files.download(file_id=file_id).read())
-
-    if not images:
-        raise RuntimeError(
-            "Mistral didn't return an image. Try rephrasing your prompt, or "
-            "confirm your account/API key has access to the image_generation "
-            "tool (it's a paid, metered feature)."
-        )
-    return images
-
 st.sidebar.markdown(
     "<span style='font-family:IBM Plex Mono, monospace; font-size:0.75rem; "
     "letter-spacing:0.1em; color:var(--text-muted); text-transform:uppercase;'>Departures</span>",
@@ -848,62 +750,6 @@ else:
     st.session_state.vector_store = None
     st.session_state.indexed_doc_name = None
     st.session_state.indexed_chunk_count = 0
-
-
-st.sidebar.markdown("---")
-st.sidebar.title("🎨 AI Image Studio")
-
-with st.sidebar.expander("Generate or edit an image", expanded=False):
-    image_mode = st.radio(
-        "Mode",
-        ["Text → Image", "Image → Image (edit)"],
-        key="image_mode",
-    )
-
-    image_prompt = st.text_area(
-        "Describe the image you want"
-        if image_mode == "Text → Image"
-        else "Describe the edits you want",
-        key="image_prompt_input",
-        height=90,
-        placeholder=(
-            "A watercolor painting of a lighthouse at sunset"
-            if image_mode == "Text → Image"
-            else "Add a rainbow in the sky, keep everything else the same"
-        ),
-    )
-
-    reference_upload = None
-    if image_mode == "Image → Image (edit)":
-        reference_upload = st.file_uploader(
-            "Reference image to edit",
-            type=["jpg", "jpeg", "png"],
-            key="image_edit_upload",
-        )
-        if reference_upload is not None:
-            st.image(reference_upload, caption="Reference image", use_container_width=True)
-
-    generate_clicked = st.button("✨ Generate Image", key="generate_image_button")
-
-    if generate_clicked:
-        if not image_prompt.strip():
-            st.warning("Please describe what you want first.")
-        elif image_mode == "Image → Image (edit)" and reference_upload is None:
-            st.warning("Please upload a reference image to edit.")
-        else:
-            with st.spinner("Generating image..."):
-                try:
-                    ref_bytes = reference_upload.getvalue() if reference_upload else None
-                    ref_mime = (reference_upload.type if reference_upload else "image/png") or "image/png"
-                    generated_images = generate_image_with_mistral(
-                        image_prompt,
-                        reference_image_bytes=ref_bytes,
-                        mime_type=ref_mime,
-                    )
-                    st.session_state.generated_images = generated_images
-                    st.success(f"Generated {len(generated_images)} image(s) — see above the chat.")
-                except Exception as e:
-                    st.error("Image generation failed: " + str(e))
 
 
 PERSONA_CONFIGS = {
@@ -1206,22 +1052,6 @@ st.markdown(
 
 if st.sidebar.button("Clear Chat History"):
     st.session_state.messages = [SystemMessage(content=base_system_prompt)]
-
-# Show any images generated via the Image Studio in the sidebar
-if st.session_state.get("generated_images"):
-    st.markdown("#### 🖼️ Generated Image(s)")
-    for gen_idx, img_bytes in enumerate(st.session_state.generated_images):
-        st.image(img_bytes, use_container_width=True)
-        st.download_button(
-            label=f"Download image {gen_idx + 1}",
-            data=img_bytes,
-            file_name=f"mistral_generated_{gen_idx + 1}.png",
-            mime="image/png",
-            key=f"download_generated_image_{gen_idx}",
-        )
-    if st.button("Clear generated image(s)", key="clear_generated_images"):
-        st.session_state.generated_images = []
-        st.rerun()
 
 # Render chat history
 for idx, msg in enumerate(st.session_state.messages):
