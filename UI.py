@@ -443,15 +443,14 @@ if os.path.exists("water.png"):
     st.image("water.png", width=150)
 
 # Mistral API key
-# SECURITY NOTE: don't hardcode secrets in source. Set MISTRAL_API_KEY as a real
-# environment variable, or put it in .streamlit/secrets.toml as:
+# SECURITY NOTE: never hardcode secrets in source. Set MISTRAL_API_KEY as a
+# real environment variable, or put it in .streamlit/secrets.toml as:
 #   MISTRAL_API_KEY = "your-key-here"
 # and it'll be picked up automatically below.
 if "MISTRAL_API_KEY" not in os.environ:
-    # Try Streamlit secrets first (recommended), then bail out with a clear error.
     try:
-        os.environ["MISTRAL_API_KEY"] = "104GgcoCq2GXWIsooV185KvvNBgVBdcg"
-    except Exception:
+        os.environ["MISTRAL_API_KEY"] = st.secrets["MISTRAL_API_KEY"]
+    except (KeyError, FileNotFoundError):
         st.error(
             "MISTRAL_API_KEY is not set. Add it to your environment or "
             ".streamlit/secrets.toml before running."
@@ -980,9 +979,69 @@ def render_retrieved_chunks(chunks: list[str], key_suffix: str) -> None:
             )
 
 
+# ---------------------------------------------------------------------------
+# Session-only name recognition
+# ---------------------------------------------------------------------------
+# Deliberately conservative: matches only explicit self-introduction
+# phrasing, filters out common non-name words that follow "I am"/"I'm", and
+# caps the candidate at 3 words so it can't swallow a whole sentence. Lives
+# entirely in st.session_state, so it never persists past this session.
+NAME_PATTERNS = [
+    r"\bmy name is\s+([A-Za-z][A-Za-z'\-]*(?:\s+[A-Za-z][A-Za-z'\-]*){0,2})",
+    r"\bi am\s+([A-Za-z][A-Za-z'\-]*(?:\s+[A-Za-z][A-Za-z'\-]*){0,2})(?=[\s,.!?]|$)",
+    r"\bi'm\s+([A-Za-z][A-Za-z'\-]*(?:\s+[A-Za-z][A-Za-z'\-]*){0,2})(?=[\s,.!?]|$)",
+    r"\bcall me\s+([A-Za-z][A-Za-z'\-]*(?:\s+[A-Za-z][A-Za-z'\-]*){0,2})",
+    r"\bthis is\s+([A-Za-z][A-Za-z'\-]*(?:\s+[A-Za-z][A-Za-z'\-]*){0,2})(?=[\s,.!?]|$)",
+]
+
+# Words that commonly follow "I am"/"I'm" but aren't names.
+NAME_BLOCKLIST = {
+    "fine", "good", "great", "okay", "ok", "sorry", "sure", "here", "back",
+    "not", "happy", "sad", "tired", "done", "ready", "trying", "looking",
+    "asking", "going", "working", "learning", "confused", "excited",
+    "nervous", "a", "an", "the", "just", "also", "still", "new", "so",
+    "really", "very", "kind", "gonna", "about", "thinking", "wondering",
+}
+
+NAME_CLAUSE_MARKER = "\n\nThe user has told you"
+
+
+def extract_name(text: str) -> str | None:
+    """Look for a self-introduction pattern in `text` and return a
+    plausible name if found, else None."""
+    for pattern in NAME_PATTERNS:
+        match = re.search(pattern, text, re.IGNORECASE)
+        if match:
+            candidate = match.group(1).strip()
+            first_word = candidate.split()[0].lower()
+            if first_word in NAME_BLOCKLIST:
+                continue
+            return " ".join(w.capitalize() for w in candidate.split())
+    return None
+
+
+def build_system_prompt_with_name(base_prompt: str, name: str | None) -> str:
+    """Append a short instruction so the model treats a detected name as a
+    known fact for the rest of this session. Strips any previously-appended
+    name clause first, so re-introductions (e.g. a correction) don't stack."""
+    clean_base = base_prompt.split(NAME_CLAUSE_MARKER)[0]
+    if not name:
+        return clean_base
+    return (
+        clean_base
+        + f"{NAME_CLAUSE_MARKER} their name is {name}. Remember this for "
+        f"the rest of the conversation. Address them by name when it feels "
+        f"natural (not every message). If asked what their name is, answer "
+        f"confidently with '{name}' — never say you don't know or can't "
+        f"remember."
+    )
+
+
 USER_AVATAR = "💧"
 ASSISTANT_AVATAR = "💧"
 
+if "user_name" not in st.session_state:
+    st.session_state.user_name = None
 
 current_config = PERSONA_CONFIGS.get(persona, make_default_config(persona))
 
@@ -997,6 +1056,7 @@ if st.session_state.get("vector_store") is not None:
         "relevant, and say so if the context doesn't cover what's being asked. "
         "Don't mention 'chunks' or the retrieval mechanism itself to the user."
     )
+base_system_prompt = build_system_prompt_with_name(base_system_prompt, st.session_state.get("user_name"))
 
 # Initialize / reset session state when persona or uploaded doc changes
 current_doc_name = uploaded_file.name if uploaded_file else None
@@ -1012,8 +1072,8 @@ if needs_reset:
     st.session_state.last_doc_name = current_doc_name
     st.session_state.messages = [SystemMessage(content=base_system_prompt)]
 else:
-    # Keep the system message in sync (e.g. RAG availability toggled) without
-    # wiping conversation history.
+    # Keep the system message in sync (e.g. RAG availability toggled, name
+    # detected) without wiping conversation history.
     if st.session_state.messages and isinstance(st.session_state.messages[0], SystemMessage):
         st.session_state.messages[0] = SystemMessage(content=base_system_prompt)
 
@@ -1050,8 +1110,12 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+if st.session_state.get("user_name"):
+    st.sidebar.markdown(f"👋 Recognized name: **{st.session_state.user_name}**")
+
 if st.sidebar.button("Clear Chat History"):
     st.session_state.messages = [SystemMessage(content=base_system_prompt)]
+    st.session_state.user_name = None
 
 # Render chat history
 for idx, msg in enumerate(st.session_state.messages):
@@ -1070,6 +1134,14 @@ for idx, msg in enumerate(st.session_state.messages):
 if user_input := st.chat_input(current_config["input_placeholder"]):
     with st.chat_message("user", avatar=USER_AVATAR):
         st.write(user_input)
+
+    # --- Name detection step (session-only) ---
+    detected_name = extract_name(user_input)
+    if detected_name and detected_name != st.session_state.get("user_name"):
+        st.session_state.user_name = detected_name
+        base_system_prompt = build_system_prompt_with_name(base_system_prompt, detected_name)
+        if st.session_state.messages and isinstance(st.session_state.messages[0], SystemMessage):
+            st.session_state.messages[0] = SystemMessage(content=base_system_prompt)
 
     # --- RAG retrieval step ---
     retrieved_chunks = retrieve_context(user_input, k=top_k)
