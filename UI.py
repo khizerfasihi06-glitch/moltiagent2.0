@@ -546,8 +546,8 @@ st.sidebar.markdown("---")
 st.sidebar.title("Reference Document (RAG)")
 
 uploaded_file = st.sidebar.file_uploader(
-    "Upload a text document or paper context:",
-    type=["txt", "pdf", "py", "csv", "json"],
+    "Upload a text document, paper context, or image (OCR):",
+    type=["txt", "pdf", "py", "csv", "json", "jpg", "jpeg", "png"],
 )
 
 with st.sidebar.expander("RAG settings", expanded=False):
@@ -623,6 +623,46 @@ def extract_pdf_text(raw_bytes: bytes) -> str:
     return text
 
 
+def extract_image_text(raw_bytes: bytes) -> str:
+    """Extract text from an image (jpg/jpeg/png) via OCR.
+
+    Requires the `pytesseract` and `Pillow` Python packages AND the
+    `tesseract-ocr` system binary to be installed (pytesseract is only a
+    thin wrapper around the actual `tesseract` executable):
+      - Debian/Ubuntu:  apt-get install tesseract-ocr
+      - macOS:          brew install tesseract
+      - Windows:        install from https://github.com/tesseract-ocr/tesseract
+      - Streamlit Community Cloud: add a `packages.txt` file to your repo
+        containing the single line `tesseract-ocr`.
+    """
+    try:
+        from PIL import Image
+        import pytesseract
+    except ImportError as e:
+        raise ImportError(
+            "Image OCR requires the 'pytesseract' and 'Pillow' packages. "
+            "Install them with: pip install pytesseract Pillow"
+        ) from e
+
+    try:
+        image = Image.open(io.BytesIO(raw_bytes))
+        text = pytesseract.image_to_string(image)
+    except pytesseract.TesseractNotFoundError as e:
+        raise RuntimeError(
+            "The 'tesseract' OCR engine is not installed on this system. "
+            "Install it (e.g. `apt-get install tesseract-ocr` on Linux, "
+            "`brew install tesseract` on macOS), or on Streamlit Community "
+            "Cloud add a packages.txt file containing 'tesseract-ocr'."
+        ) from e
+
+    if not text.strip():
+        raise ValueError(
+            "OCR could not find any text in this image. Try a clearer, "
+            "higher-resolution image with legible text."
+        )
+    return text
+
+
 @st.cache_resource(show_spinner=False)
 def build_vector_store(doc_text: str, chunk_size: int, chunk_overlap: int, doc_name: str):
     """Split doc_text into overlapping chunks, embed them, and build a FAISS
@@ -665,9 +705,17 @@ raw_document_text = ""
 if uploaded_file is not None:
     try:
         raw = uploaded_file.getvalue()
+        fname_lower = uploaded_file.name.lower()
 
-        if uploaded_file.name.lower().endswith(".pdf"):
+        if fname_lower.endswith(".pdf"):
             raw_document_text = extract_pdf_text(raw)
+        elif fname_lower.endswith((".jpg", ".jpeg", ".png")):
+            with st.sidebar.status("Running OCR on image...", expanded=False) as ocr_status:
+                raw_document_text = extract_image_text(raw)
+                ocr_status.update(
+                    label=f"Extracted {len(raw_document_text)} characters via OCR",
+                    state="complete",
+                )
         else:
             # Text-like files: txt, py, csv, json
             try:
