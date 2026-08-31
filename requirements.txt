@@ -4,5 +4,7 @@ langchain-mistralai
 langchain-text-splitters
 langchain-community
 faiss-cpu
-matplotlib
 pypdf
+matplotlib
+pytesseract
+Pillow
