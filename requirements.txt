@@ -1,4 +1,5 @@
 streamlit
+mistralai
 langchain-core
 langchain-mistralai
 langchain-text-splitters
