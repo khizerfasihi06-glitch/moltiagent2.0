@@ -573,12 +573,12 @@ def persona_selector_modal():
         key="persona_modal_choice",
     )
     st.markdown(
-        f'<div class="persona-current-pill">🎫 Currently boarded: {current}</div>',
+        f'<div class="persona-current-pill"> Currently boarded: {current}</div>',
         unsafe_allow_html=True,
     )
     col1, col2 = st.columns(2)
     with col1:
-        if st.button("🎟️ Board this flight", use_container_width=True, type="primary"):
+        if st.button(" Board this flight", use_container_width=True, type="primary"):
             st.session_state.selected_persona = choice
             st.rerun()
     with col2:
@@ -593,7 +593,7 @@ st.sidebar.markdown(
 )
 st.sidebar.title("Choose Your Flight")
 st.sidebar.markdown(f"**Currently flying:** {st.session_state.selected_persona}")
-if st.sidebar.button("🔄 Change Flight", use_container_width=True):
+if st.sidebar.button("Change Flight", use_container_width=True):
     persona_selector_modal()
 
 persona = st.session_state.selected_persona
