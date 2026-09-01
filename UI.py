@@ -449,7 +449,7 @@ if os.path.exists("water.png"):
 # and it'll be picked up automatically below.
 if "MISTRAL_API_KEY" not in os.environ:
     try:
-        os.environ["MISTRAL_API_KEY"] = st.secrets["MISTRAL_API_KEY"]
+        os.environ["R1u2KVvwN3wmvZGTWiwFEEIlrUKqx5VV"] = "R1u2KVvwN3wmvZGTWiwFEEIlrUKqx5VV"
     except (KeyError, FileNotFoundError):
         st.error(
             "MISTRAL_API_KEY is not set. Add it to your environment or "
