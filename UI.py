@@ -426,6 +426,28 @@ div[data-baseweb="select"]:focus-within {
     margin-bottom: 0.4rem;
     white-space: pre-wrap;
 }
+
+/* ---------------- Persona modal ("Choose Your Flight" dialog) ---------------- */
+.persona-modal-caption {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    margin-bottom: 0.6rem;
+}
+.persona-current-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.72rem;
+    letter-spacing: 0.04em;
+    color: var(--marigold);
+    background: color-mix(in srgb, var(--marigold) 14%, transparent);
+    border: 1px dashed var(--marigold);
+    border-radius: 999px;
+    padding: 0.3rem 0.7rem;
+    margin: 0.3rem 0 0.8rem 0;
+}
 </style>
 """
 st.markdown(DESIGN_CSS, unsafe_allow_html=True)
@@ -444,13 +466,14 @@ if os.path.exists("water.png"):
 
 # Mistral API key
 # SECURITY NOTE: never hardcode secrets in source. Set MISTRAL_API_KEY as a
-# real environment variable, or put it in .streamlit/secrets.toml as:
+# real environment variable, or put it in .streamlit/secrets.toml (locally)
+# or in your Streamlit Community Cloud app's Settings -> Secrets as:
 #   MISTRAL_API_KEY = "your-key-here"
 # and it'll be picked up automatically below.
 if "MISTRAL_API_KEY" not in os.environ:
     try:
         os.environ["R1u2KVvwN3wmvZGTWiwFEEIlrUKqx5VV"] = "R1u2KVvwN3wmvZGTWiwFEEIlrUKqx5VV"
-    except (KeyError, FileNotFoundError):
+    except Exception:
         st.error(
             "MISTRAL_API_KEY is not set. Add it to your environment or "
             ".streamlit/secrets.toml before running."
@@ -472,13 +495,6 @@ def get_embeddings():
 
 model = get_model()
 embeddings = get_embeddings()
-
-st.sidebar.markdown(
-    "<span style='font-family:IBM Plex Mono, monospace; font-size:0.75rem; "
-    "letter-spacing:0.1em; color:var(--text-muted); text-transform:uppercase;'>Departures</span>",
-    unsafe_allow_html=True,
-)
-st.sidebar.title("Choose Your Flight")
 
 persona_options = [
     "Amazon",
@@ -536,10 +552,51 @@ persona_options = [
     "World History & Archaeology",
 ]
 
-persona = st.sidebar.selectbox(
-    label="Choose Which AI do you want:",
-    options=persona_options,
+if "selected_persona" not in st.session_state:
+    st.session_state.selected_persona = persona_options[0]
+
+
+@st.dialog("✈️ Choose Your Flight")
+def persona_selector_modal():
+    """Modal (popup) persona picker. Opened via the sidebar button below.
+    Keeps a pending choice in its own widget key so nothing changes until
+    the user explicitly confirms."""
+    st.markdown(
+        '<div class="persona-modal-caption">Pick which AI expert you want to board today.</div>',
+        unsafe_allow_html=True,
+    )
+    current = st.session_state.selected_persona
+    choice = st.selectbox(
+        "Destination",
+        options=persona_options,
+        index=persona_options.index(current) if current in persona_options else 0,
+        key="persona_modal_choice",
+    )
+    st.markdown(
+        f'<div class="persona-current-pill">🎫 Currently boarded: {current}</div>',
+        unsafe_allow_html=True,
+    )
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("🎟️ Board this flight", use_container_width=True, type="primary"):
+            st.session_state.selected_persona = choice
+            st.rerun()
+    with col2:
+        if st.button("Cancel", use_container_width=True):
+            st.rerun()
+
+
+st.sidebar.markdown(
+    "<span style='font-family:IBM Plex Mono, monospace; font-size:0.75rem; "
+    "letter-spacing:0.1em; color:var(--text-muted); text-transform:uppercase;'>Departures</span>",
+    unsafe_allow_html=True,
 )
+st.sidebar.title("Choose Your Flight")
+st.sidebar.markdown(f"**Currently flying:** {st.session_state.selected_persona}")
+if st.sidebar.button("🔄 Change Flight", use_container_width=True):
+    persona_selector_modal()
+
+persona = st.session_state.selected_persona
 
 st.sidebar.markdown("---")
 st.sidebar.title("Reference Document (RAG)")
@@ -815,7 +872,7 @@ PERSONA_CONFIGS = {
             "modern, widely-used, well-documented tools and clean, "
             "production-quality code over exotic or deprecated approaches."
         ),
-        "spinner": "Wiring up the stack...",
+        "spinner": "Searching ",
     },
     # add other specific configs as you prefer...
 }
