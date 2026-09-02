@@ -470,9 +470,13 @@ if os.path.exists("water.png"):
 # or in your Streamlit Community Cloud app's Settings -> Secrets as:
 #   MISTRAL_API_KEY = "your-key-here"
 
-os.environ["R1u2KVvwN3wmvZGTWiwFEEIlrUKqx5VV"] = "R1u2KVvwN3wmvZGTWiwFEEIlrUKqx5VV"
-
-
+# Do NOT hardcode the key in source. Load it from an env var or Streamlit secrets.
+if "MISTRAL_API_KEY" not in os.environ:
+    if "MISTRAL_API_KEY" in st.secrets:
+        os.environ["MISTRAL_API_KEY"] = st.secrets["MISTRAL_API_KEY"]
+    else:
+        st.error("MISTRAL_API_KEY not found. Set it as an environment variable or in .streamlit/secrets.toml.")
+        st.stop()
 
 # Model factory (cached)
 @st.cache_resource
