@@ -267,74 +267,59 @@ st.markdown(DESIGN_CSS, unsafe_allow_html=True)
 with st.sidebar:
     st.title("🛫 Departure Lounge")
 
-    # Expert Selection Matrix — 60 personas, each with a unique boarding-pass code
-    _PERSONA_TABLE = [
-        ("General Assistant", "SYS-OK", "Versatile operations and systemic problem solver."),
-        ("Technical Architect", "DEV-ENG", "Specialist in systems scale, structural code layout, and clean pipelines."),
-        ("Creative Copywriter", "CRT-WRT", "Polished narratives, design architecture copy, and punchy conceptual hooks."),
-        ("Financial Strategy Analyst", "FIN-STR", "Calculations grounding, trend tracking, and macro evaluation logic."),
-        ("Data Scientist", "DAT-SCI", "Statistical modeling, exploratory analysis, and predictive insight extraction."),
-        ("UX/UI Designer", "UX-DSN", "Interface flows, usability heuristics, and human-centered layout thinking."),
-        ("Product Manager", "PRD-MGT", "Roadmapping, prioritization frameworks, and cross-functional alignment."),
-        ("Marketing Strategist", "MKT-STR", "Positioning, campaign architecture, and audience segmentation logic."),
-        ("SEO Specialist", "SEO-OPT", "Keyword strategy, technical audits, and organic ranking optimization."),
-        ("Social Media Manager", "SOC-MED", "Platform-native content, engagement loops, and community voice."),
-        ("Legal Advisor", "LAW-GEN", "Plain-language contract and compliance explanations, non-binding guidance."),
-        ("HR Consultant", "HR-PPL", "Hiring frameworks, policy drafting, and workplace culture guidance."),
-        ("Career Coach", "CAR-CO", "Resume positioning, interview prep, and career-path strategy."),
-        ("Life Coach", "LIF-CO", "Goal clarity, habit design, and motivational accountability framing."),
-        ("Fitness Trainer", "FIT-TRN", "Training splits, progressive overload logic, and movement form cues."),
-        ("Nutritionist", "NUT-GEN", "General healthy-eating principles and macro/micronutrient literacy."),
-        ("Travel Planner", "TRV-PLN", "Itinerary building, logistics sequencing, and destination scouting."),
-        ("Language Tutor", "LNG-TUT", "Grammar drills, conversational practice, and vocabulary scaffolding."),
-        ("Math Tutor", "MTH-TUT", "Step-by-step problem solving across algebra, calculus, and stats."),
-        ("Science Educator", "SCI-EDU", "Concept explanations across physics, chemistry, and biology."),
-        ("History Buff", "HIS-LOR", "Contextual storytelling and cross-era historical connections."),
-        ("Philosophy Guide", "PHI-THT", "Argument structures, thought experiments, and ethical frameworks."),
-        ("Psychology Consultant", "PSY-INF", "General psychological concepts and evidence-based frameworks."),
-        ("Public Speaking Coach", "SPK-COA", "Structure, delivery cadence, and stage-presence technique."),
-        ("Resume Writer", "RES-WRT", "Achievement framing, ATS-friendly formatting, and concise phrasing."),
-        ("Startup Advisor", "STR-ADV", "Lean validation, MVP scoping, and early traction tactics."),
-        ("Venture Capitalist", "VC-FUND", "Pitch evaluation, market sizing, and cap-table fundamentals."),
-        ("Real Estate Advisor", "RE-PROP", "Market comps, negotiation angles, and property evaluation basics."),
-        ("Interior Designer", "INT-DSN", "Spatial planning, color theory, and furnishing composition."),
-        ("Fashion Stylist", "FSH-STY", "Silhouette pairing, wardrobe capsules, and trend-aware styling."),
-        ("Chef & Culinary Expert", "CHF-KTC", "Flavor pairing, technique guidance, and recipe development."),
-        ("Sommelier", "SOM-WIN", "Varietal profiles, pairing logic, and tasting-note vocabulary."),
-        ("Music Producer", "MUS-PRD", "Arrangement structure, mixing fundamentals, and genre conventions."),
-        ("Film Critic", "FLM-CRT", "Narrative analysis, cinematography reads, and thematic interpretation."),
-        ("Book Editor", "BK-EDT", "Structural feedback, line editing, and pacing diagnostics."),
-        ("Poet", "PO-VRS", "Imagery, meter awareness, and figurative language craft."),
-        ("Game Designer", "GAM-DSN", "Mechanics balancing, level flow, and player-motivation loops."),
-        ("Cybersecurity Analyst", "SEC-DEF", "Threat modeling, hardening practices, and incident-response thinking."),
-        ("DevOps Engineer", "OPS-CI", "Pipeline automation, infrastructure-as-code, and deployment reliability."),
-        ("Cloud Architect", "CLD-ARC", "Service topology, scalability tradeoffs, and cost-aware design."),
-        ("Database Administrator", "DB-ADM", "Schema design, indexing strategy, and query optimization."),
-        ("Mobile App Developer", "MOB-DEV", "Native/cross-platform patterns and mobile UX constraints."),
-        ("Blockchain Consultant", "BLK-CHN", "Smart-contract logic, consensus tradeoffs, and tokenomics basics."),
-        ("AI/ML Researcher", "AI-RSCH", "Model architecture reasoning, training tradeoffs, and eval design."),
-        ("Environmental Scientist", "ENV-SCI", "Ecosystem dynamics, climate literacy, and impact assessment framing."),
-        ("Sustainability Consultant", "SUS-CON", "Circular-economy thinking and organizational footprint reduction."),
-        ("Urban Planner", "URB-PLN", "Zoning logic, transit design, and livability tradeoffs."),
-        ("Political Analyst", "POL-ANL", "Balanced framing of policy mechanics and institutional dynamics."),
-        ("Economist", "ECO-THY", "Macro/micro tradeoffs, incentive structures, and market reasoning."),
-        ("Tax Advisor", "TAX-GEN", "General tax-concept literacy, non-binding, plain-language framing."),
-        ("Insurance Advisor", "INS-POL", "Coverage-type literacy and risk-tradeoff explanations."),
-        ("Medical Information Guide", "MED-INF", "General health literacy; always defers to licensed professionals."),
-        ("Mental Health Support Guide", "MH-SUP", "Supportive, non-diagnostic guidance; encourages professional care."),
-        ("Parenting Coach", "PAR-COA", "Developmental-stage framing and everyday parenting strategies."),
-        ("Relationship Counselor", "REL-CNS", "Communication frameworks and conflict-resolution structures."),
-        ("Etiquette Advisor", "ETQ-GEN", "Social-norm navigation across professional and personal settings."),
-        ("Event Planner", "EVT-PLN", "Logistics sequencing, vendor coordination, and run-of-show design."),
-        ("Photography Mentor", "PHO-MNT", "Composition rules, lighting logic, and gear-agnostic technique."),
-        ("Journalist", "JRN-RPT", "Lead structuring, source framing, and clear factual reporting style."),
-        ("Debate Coach", "DBT-COA", "Argument construction, rebuttal strategy, and rhetorical structure."),
+    # Expert Selection Matrix — 1,000 personas, generated from 50 domains x
+    # 20 role types (50 x 20 = 1000 unique combinations). Each domain and
+    # each role has its own unique 3-letter code, so every "DOMAIN-ROLE"
+    # stamp is guaranteed unique without listing 1,000 lines by hand.
+    _DOMAINS = [
+        ("Marketing", "MKT"), ("Finance", "FIN"), ("Healthcare", "HLT"), ("Legal", "LAW"),
+        ("Technology", "TEC"), ("Education", "EDU"), ("Real Estate", "RES"), ("Hospitality", "HOS"),
+        ("Retail", "RET"), ("Manufacturing", "MFG"), ("Agriculture", "AGR"), ("Energy", "ENR"),
+        ("Transportation", "TRN"), ("Logistics", "LOG"), ("Construction", "CON"), ("Automotive", "AUT"),
+        ("Aerospace", "AER"), ("Telecommunications", "TEL"), ("Insurance", "INS"), ("Banking", "BNK"),
+        ("Nonprofit", "NPO"), ("Government", "GOV"), ("Media", "MED"), ("Entertainment", "ENT"),
+        ("Sports", "SPT"), ("Fashion", "FSH"), ("Food & Beverage", "FNB"), ("Environmental", "ENV"),
+        ("Cybersecurity", "CYB"), ("Artificial Intelligence", "AIX"), ("Blockchain", "BLK"),
+        ("Biotechnology", "BIO"), ("Pharmaceuticals", "PHM"), ("Mental Health", "MHL"), ("Fitness", "FIT"),
+        ("Nutrition", "NUT"), ("Travel", "TRV"), ("Music", "MUS"), ("Film", "FLM"), ("Publishing", "PUB"),
+        ("Architecture", "ARC"), ("Interior Design", "INT"), ("Urban Planning", "URB"),
+        ("Human Resources", "HRS"), ("Supply Chain", "SPC"), ("E-commerce", "ECM"), ("Gaming", "GAM"),
+        ("Photography", "PHO"), ("Journalism", "JRN"), ("Political Science", "POL"),
+    ]
+    _ROLES = [
+        ("Strategist", "STR", "framing high-leverage plans and trade-off analysis"),
+        ("Analyst", "ANL", "breaking down data, trends, and metrics into clear takeaways"),
+        ("Consultant", "CNS", "diagnosing problems and recommending practical fixes"),
+        ("Coach", "COA", "building accountability, habits, and skill progression"),
+        ("Specialist", "SPL", "bringing deep, technical, domain-specific know-how"),
+        ("Architect", "ARC", "structuring systems, workflows, and long-term design"),
+        ("Advisor", "ADV", "giving plain-language guidance grounded in best practices"),
+        ("Researcher", "RSR", "synthesizing evidence and current thinking in the field"),
+        ("Writer", "WRT", "producing clear, audience-tailored written content"),
+        ("Planner", "PLN", "sequencing steps, logistics, and timelines"),
+        ("Designer", "DSN", "shaping user-facing form, flow, and experience"),
+        ("Engineer", "ENG", "building and troubleshooting technical systems"),
+        ("Manager", "MGR", "coordinating people, priorities, and delivery"),
+        ("Educator", "EDC", "explaining concepts clearly for learners at any level"),
+        ("Mentor", "MTR", "offering experience-based guidance and encouragement"),
+        ("Auditor", "AUD", "reviewing processes for accuracy, risk, and compliance"),
+        ("Developer", "DEV", "building functional, maintainable technical solutions"),
+        ("Curator", "CUR", "selecting, organizing, and contextualizing quality content"),
+        ("Producer", "PRD", "coordinating end-to-end delivery of a finished output"),
+        ("Facilitator", "FAC", "guiding discussions, workshops, and group decisions"),
     ]
 
-    persona_configs = {
-        name: {"channel": f"CH-{idx + 1:02d}", "stamp": stamp, "desc": desc}
-        for idx, (name, stamp, desc) in enumerate(_PERSONA_TABLE)
-    }
+    persona_configs = {}
+    idx = 0
+    for domain_name, domain_code in _DOMAINS:
+        for role_name, role_code, role_blurb in _ROLES:
+            idx += 1
+            persona_name = f"{domain_name} {role_name}"
+            persona_configs[persona_name] = {
+                "channel": f"CH-{idx:04d}",
+                "stamp": f"{domain_code}-{role_code}",
+                "desc": f"{role_name} {role_blurb}, applied to {domain_name.lower()} contexts."
+            }
 
     persona_option = st.selectbox(
         "Choose Your AI Guide:",
