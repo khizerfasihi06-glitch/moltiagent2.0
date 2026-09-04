@@ -1,4 +1,5 @@
 streamlit
+torchvision
 langchain-groq
 mistralai>=1.2.0
 langchain-core
