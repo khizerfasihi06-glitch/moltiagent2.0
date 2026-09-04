@@ -7,8 +7,11 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_groq import ChatGroq
 from langchain_community.embeddings import FastEmbedEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_community.vectorstores import FAISS
+from langchain_community.vectorstores import Chroma
 from langchain_core.documents import Document
+from reportlab.lib.pagesizes import letter
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+from reportlab.lib.styles import getSampleStyleSheet
 
 # 1. Page Configuration
 st.set_page_config(page_title="Avatar AI Experts", page_icon="💧", layout="centered")
@@ -25,7 +28,7 @@ def init_groq_llm():
         st.stop()
 
     return ChatGroq(
-        model="openai/gpt-oss-120b",
+        model="llama-3.3-70b-versatile",
         api_key=api_key,
         max_retries=5,  # Automatically waits and backs off exponentially on 429s
         timeout=60
@@ -45,14 +48,42 @@ def init_embeddings():
 llm = init_groq_llm()
 embeddings = init_embeddings()
 
-@st.cache_data(show_spinner="Analyzing documents and generating vector space...")
+@st.cache_resource(show_spinner="Analyzing documents and generating vector space...")
 def build_vector_store(text_content):
-    """Chunks text and generates FAISS embeddings safely inside a data cache layer."""
+    """Chunks text and generates a ChromaDB collection, cached as a live resource
+       (Chroma holds an active client connection, so cache_resource is the correct
+       cache type here rather than cache_data)."""
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
     docs = [Document(page_content=x) for x in text_splitter.split_text(text_content) if x.strip()]
     if not docs:
         return None
-    return FAISS.from_documents(docs, embeddings)
+    # In-memory, ephemeral Chroma collection scoped to this session's document set
+    return Chroma.from_documents(docs, embeddings, collection_name="avatar_session_docs")
+
+
+def generate_chat_pdf(persona_name, history):
+    """Renders the conversation transcript (excluding the system prompt) into a
+       PDF and returns it as raw bytes, ready for st.download_button."""
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter)
+    styles = getSampleStyleSheet()
+    story = [Paragraph(f"Conversation Transcript — {persona_name}", styles["Title"]), Spacer(1, 14)]
+
+    for msg in history:
+        if isinstance(msg, SystemMessage):
+            continue
+        speaker = "You" if isinstance(msg, HumanMessage) else "Assistant"
+        # Escape reportlab markup characters and preserve line breaks
+        safe_content = (
+            msg.content.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\n", "<br/>")
+        )
+        story.append(Paragraph(speaker, styles["Heading4"]))
+        story.append(Paragraph(safe_content, styles["Normal"]))
+        story.append(Spacer(1, 10))
+
+    doc.build(story)
+    buffer.seek(0)
+    return buffer.getvalue()
 
 
 # 3. CSS Styling System ("Boarding Pass")
@@ -352,6 +383,33 @@ if uploaded_file is not None:
     raw_text = stringio.read()
     if raw_text.strip():
         vectorstore = build_vector_store(raw_text)
+
+# One-time PDF export of the conversation transcript, shown in the sidebar
+if "pdf_download_used" not in st.session_state:
+    st.session_state.pdf_download_used = False
+
+def _mark_pdf_downloaded():
+    st.session_state.pdf_download_used = True
+
+with st.sidebar:
+    st.markdown("---")
+    st.subheader("📄 Export Transcript")
+    has_conversation = any(isinstance(m, HumanMessage) for m in st.session_state.chat_history)
+
+    if st.session_state.pdf_download_used:
+        st.caption("✅ PDF already downloaded this session.")
+    elif has_conversation:
+        pdf_bytes = generate_chat_pdf(persona_option, st.session_state.chat_history)
+        st.download_button(
+            label="⬇️ Download Conversation as PDF",
+            data=pdf_bytes,
+            file_name=f"{persona_option.replace(' ', '_').replace('/', '-')}_transcript.pdf",
+            mime="application/pdf",
+            on_click=_mark_pdf_downloaded,
+            key="pdf_download_once"
+        )
+    else:
+        st.caption("Start chatting to enable PDF export.")
 
 # 6. Header / Ticket UI
 st.markdown(f"""
