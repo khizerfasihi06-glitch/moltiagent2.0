@@ -5,7 +5,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_groq import ChatGroq
-from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_community.embeddings import FastEmbedEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import FAISS
 from langchain_core.documents import Document
@@ -34,10 +34,12 @@ def init_groq_llm():
 @st.cache_resource
 def init_embeddings():
     """Initializes and caches the text embedding layer.
-       Groq does not currently offer an embeddings endpoint, so we use a
-       lightweight local HuggingFace sentence-transformer model instead —
-       this keeps RAG fully functional without needing a second API key."""
-    return HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+       Groq does not currently offer an embeddings endpoint, so we use
+       FastEmbed — a lightweight, ONNX-based local embedding model with no
+       torch/transformers dependency. This keeps RAG fully functional
+       without a second API key and avoids heavy ML-stack install issues
+       (e.g. the torchvision import error some transformers versions hit)."""
+    return FastEmbedEmbeddings(model_name="BAAI/bge-small-en-v1.5")
 
 # Instantiate the cached singletons
 llm = init_groq_llm()
@@ -265,19 +267,80 @@ st.markdown(DESIGN_CSS, unsafe_allow_html=True)
 with st.sidebar:
     st.title("🛫 Departure Lounge")
 
-    # Expert Selection Matrix
+    # Expert Selection Matrix — 60 personas, each with a unique boarding-pass code
+    _PERSONA_TABLE = [
+        ("General Assistant", "SYS-OK", "Versatile operations and systemic problem solver."),
+        ("Technical Architect", "DEV-ENG", "Specialist in systems scale, structural code layout, and clean pipelines."),
+        ("Creative Copywriter", "CRT-WRT", "Polished narratives, design architecture copy, and punchy conceptual hooks."),
+        ("Financial Strategy Analyst", "FIN-STR", "Calculations grounding, trend tracking, and macro evaluation logic."),
+        ("Data Scientist", "DAT-SCI", "Statistical modeling, exploratory analysis, and predictive insight extraction."),
+        ("UX/UI Designer", "UX-DSN", "Interface flows, usability heuristics, and human-centered layout thinking."),
+        ("Product Manager", "PRD-MGT", "Roadmapping, prioritization frameworks, and cross-functional alignment."),
+        ("Marketing Strategist", "MKT-STR", "Positioning, campaign architecture, and audience segmentation logic."),
+        ("SEO Specialist", "SEO-OPT", "Keyword strategy, technical audits, and organic ranking optimization."),
+        ("Social Media Manager", "SOC-MED", "Platform-native content, engagement loops, and community voice."),
+        ("Legal Advisor", "LAW-GEN", "Plain-language contract and compliance explanations, non-binding guidance."),
+        ("HR Consultant", "HR-PPL", "Hiring frameworks, policy drafting, and workplace culture guidance."),
+        ("Career Coach", "CAR-CO", "Resume positioning, interview prep, and career-path strategy."),
+        ("Life Coach", "LIF-CO", "Goal clarity, habit design, and motivational accountability framing."),
+        ("Fitness Trainer", "FIT-TRN", "Training splits, progressive overload logic, and movement form cues."),
+        ("Nutritionist", "NUT-GEN", "General healthy-eating principles and macro/micronutrient literacy."),
+        ("Travel Planner", "TRV-PLN", "Itinerary building, logistics sequencing, and destination scouting."),
+        ("Language Tutor", "LNG-TUT", "Grammar drills, conversational practice, and vocabulary scaffolding."),
+        ("Math Tutor", "MTH-TUT", "Step-by-step problem solving across algebra, calculus, and stats."),
+        ("Science Educator", "SCI-EDU", "Concept explanations across physics, chemistry, and biology."),
+        ("History Buff", "HIS-LOR", "Contextual storytelling and cross-era historical connections."),
+        ("Philosophy Guide", "PHI-THT", "Argument structures, thought experiments, and ethical frameworks."),
+        ("Psychology Consultant", "PSY-INF", "General psychological concepts and evidence-based frameworks."),
+        ("Public Speaking Coach", "SPK-COA", "Structure, delivery cadence, and stage-presence technique."),
+        ("Resume Writer", "RES-WRT", "Achievement framing, ATS-friendly formatting, and concise phrasing."),
+        ("Startup Advisor", "STR-ADV", "Lean validation, MVP scoping, and early traction tactics."),
+        ("Venture Capitalist", "VC-FUND", "Pitch evaluation, market sizing, and cap-table fundamentals."),
+        ("Real Estate Advisor", "RE-PROP", "Market comps, negotiation angles, and property evaluation basics."),
+        ("Interior Designer", "INT-DSN", "Spatial planning, color theory, and furnishing composition."),
+        ("Fashion Stylist", "FSH-STY", "Silhouette pairing, wardrobe capsules, and trend-aware styling."),
+        ("Chef & Culinary Expert", "CHF-KTC", "Flavor pairing, technique guidance, and recipe development."),
+        ("Sommelier", "SOM-WIN", "Varietal profiles, pairing logic, and tasting-note vocabulary."),
+        ("Music Producer", "MUS-PRD", "Arrangement structure, mixing fundamentals, and genre conventions."),
+        ("Film Critic", "FLM-CRT", "Narrative analysis, cinematography reads, and thematic interpretation."),
+        ("Book Editor", "BK-EDT", "Structural feedback, line editing, and pacing diagnostics."),
+        ("Poet", "PO-VRS", "Imagery, meter awareness, and figurative language craft."),
+        ("Game Designer", "GAM-DSN", "Mechanics balancing, level flow, and player-motivation loops."),
+        ("Cybersecurity Analyst", "SEC-DEF", "Threat modeling, hardening practices, and incident-response thinking."),
+        ("DevOps Engineer", "OPS-CI", "Pipeline automation, infrastructure-as-code, and deployment reliability."),
+        ("Cloud Architect", "CLD-ARC", "Service topology, scalability tradeoffs, and cost-aware design."),
+        ("Database Administrator", "DB-ADM", "Schema design, indexing strategy, and query optimization."),
+        ("Mobile App Developer", "MOB-DEV", "Native/cross-platform patterns and mobile UX constraints."),
+        ("Blockchain Consultant", "BLK-CHN", "Smart-contract logic, consensus tradeoffs, and tokenomics basics."),
+        ("AI/ML Researcher", "AI-RSCH", "Model architecture reasoning, training tradeoffs, and eval design."),
+        ("Environmental Scientist", "ENV-SCI", "Ecosystem dynamics, climate literacy, and impact assessment framing."),
+        ("Sustainability Consultant", "SUS-CON", "Circular-economy thinking and organizational footprint reduction."),
+        ("Urban Planner", "URB-PLN", "Zoning logic, transit design, and livability tradeoffs."),
+        ("Political Analyst", "POL-ANL", "Balanced framing of policy mechanics and institutional dynamics."),
+        ("Economist", "ECO-THY", "Macro/micro tradeoffs, incentive structures, and market reasoning."),
+        ("Tax Advisor", "TAX-GEN", "General tax-concept literacy, non-binding, plain-language framing."),
+        ("Insurance Advisor", "INS-POL", "Coverage-type literacy and risk-tradeoff explanations."),
+        ("Medical Information Guide", "MED-INF", "General health literacy; always defers to licensed professionals."),
+        ("Mental Health Support Guide", "MH-SUP", "Supportive, non-diagnostic guidance; encourages professional care."),
+        ("Parenting Coach", "PAR-COA", "Developmental-stage framing and everyday parenting strategies."),
+        ("Relationship Counselor", "REL-CNS", "Communication frameworks and conflict-resolution structures."),
+        ("Etiquette Advisor", "ETQ-GEN", "Social-norm navigation across professional and personal settings."),
+        ("Event Planner", "EVT-PLN", "Logistics sequencing, vendor coordination, and run-of-show design."),
+        ("Photography Mentor", "PHO-MNT", "Composition rules, lighting logic, and gear-agnostic technique."),
+        ("Journalist", "JRN-RPT", "Lead structuring, source framing, and clear factual reporting style."),
+        ("Debate Coach", "DBT-COA", "Argument construction, rebuttal strategy, and rhetorical structure."),
+    ]
+
+    persona_configs = {
+        name: {"channel": f"CH-{idx + 1:02d}", "stamp": stamp, "desc": desc}
+        for idx, (name, stamp, desc) in enumerate(_PERSONA_TABLE)
+    }
+
     persona_option = st.selectbox(
         "Choose Your AI Guide:",
-        ["General Assistant", "Technical Architect", "Creative Copywriter", "Financial Strategy Analyst"]
+        list(persona_configs.keys())
     )
 
-    # Dynamic properties assigned based on profile choice
-    persona_configs = {
-        "General Assistant": {"channel": "CH-01", "stamp": "SYS-OK", "desc": "Versatile operations and systemic problem solver."},
-        "Technical Architect": {"channel": "CH-42", "stamp": "DEV-ENG", "desc": "Specialist in systems scale, structural code layout, and clean pipelines."},
-        "Creative Copywriter": {"channel": "CH-88", "stamp": "CRT-WRT", "desc": "Polished narratives, design architecture copy, and punchy conceptual hooks."},
-        "Financial Strategy Analyst": {"channel": "CH-07", "stamp": "FIN-STR", "desc": "Calculations grounding, trend tracking, and macro evaluation logic."}
-    }
     config = persona_configs[persona_option]
 
     st.markdown("---")
