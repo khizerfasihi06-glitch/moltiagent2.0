@@ -4,7 +4,8 @@ import re
 import streamlit as st
 import streamlit.components.v1 as components
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
-from langchain_mistralai import ChatMistralAI, MistralAIEmbeddings
+from langchain_groq import ChatGroq
+from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import FAISS
 from langchain_core.documents import Document
@@ -12,36 +13,35 @@ from langchain_core.documents import Document
 # 1. Page Configuration
 st.set_page_config(page_title="Avatar AI Experts", page_icon="💧", layout="centered")
 
-# 2. Optimized & Cached Mistral / LangChain Initializers (Prevents 429 Errors)
+# 2. Optimized & Cached Groq / LangChain Initializers (Prevents 429 Errors)
 @st.cache_resource
-def init_mistral_llm():
+def init_groq_llm():
     """Initializes and caches the chat model.
        Implements automatic backoff retries on rate limits (429s)."""
     # Fallback to streamlit secrets or environment variables
-    api_key = st.secrets.get("MISTRAL_API_KEY") or os.environ.get("MISTRAL_API_KEY")
+    api_key = st.secrets.get("GROQ_API_KEY") or os.environ.get("GROQ_API_KEY")
     if not api_key:
-        st.error("Missing MISTRAL_API_KEY. Please set it in your environment variables or Streamlit secrets.")
+        st.error("Missing GROQ_API_KEY. Please set it in your environment variables or Streamlit secrets.")
         st.stop()
-        
-    return ChatMistralAI(
-        model="mistral-large-latest",
+
+    return ChatGroq(
+        model="llama-3.3-70b-versatile",
         api_key=api_key,
         max_retries=5,  # Automatically waits and backs off exponentially on 429s
         timeout=60
     )
 
 @st.cache_resource
-def init_mistral_embeddings():
-    """Initializes and caches the text embedding layer."""
-    api_key = st.secrets.get("MISTRAL_API_KEY") or os.environ.get("MISTRAL_API_KEY")
-    return MistralAIEmbeddings(
-        model="mistral-embed",
-        api_key=api_key
-    )
+def init_embeddings():
+    """Initializes and caches the text embedding layer.
+       Groq does not currently offer an embeddings endpoint, so we use a
+       lightweight local HuggingFace sentence-transformer model instead —
+       this keeps RAG fully functional without needing a second API key."""
+    return HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
 
 # Instantiate the cached singletons
-llm = init_mistral_llm()
-embeddings = init_mistral_embeddings()
+llm = init_groq_llm()
+embeddings = init_embeddings()
 
 @st.cache_data(show_spinner="Analyzing documents and generating vector space...")
 def build_vector_store(text_content):
@@ -259,18 +259,18 @@ section[data-testid="stSidebar"] label {
 }
 </style>
 """
-st.markdown(DESIGN_CSS, unsafe_with_html=True)
+st.markdown(DESIGN_CSS, unsafe_allow_html=True)
 
 # 4. Sidebar Elements & Configuration State
 with st.sidebar:
     st.title("🛫 Departure Lounge")
-    
+
     # Expert Selection Matrix
     persona_option = st.selectbox(
         "Choose Your AI Guide:",
         ["General Assistant", "Technical Architect", "Creative Copywriter", "Financial Strategy Analyst"]
     )
-    
+
     # Dynamic properties assigned based on profile choice
     persona_configs = {
         "General Assistant": {"channel": "CH-01", "stamp": "SYS-OK", "desc": "Versatile operations and systemic problem solver."},
@@ -304,3 +304,65 @@ if uploaded_file is not None:
     raw_text = stringio.read()
     if raw_text.strip():
         vectorstore = build_vector_store(raw_text)
+
+# 6. Header / Ticket UI
+st.markdown(f"""
+<div class="ticket">
+    <div class="ticket-stub">
+        <div class="no-label">Channel</div>
+        <div class="no-value">{config['channel']}</div>
+    </div>
+    <div class="ticket-perf"></div>
+    <div class="ticket-main">
+        <div class="ticket-eyebrow">Boarding Pass · AI Expert Session</div>
+        <h1 class="ticket-title">{persona_option}</h1>
+        <p class="ticket-subtitle">{config['desc']}</p>
+        <div class="ticket-stamp">{config['stamp']}</div>
+    </div>
+</div>
+""", unsafe_allow_html=True)
+
+if vectorstore is not None:
+    st.markdown(
+        '<div class="topnav"><span class="topnav-brand">📁 Context Loaded</span>'
+        '<span class="topnav-status">RAG Active</span></div>',
+        unsafe_allow_html=True
+    )
+
+# 7. Chat History Rendering
+for msg in st.session_state.chat_history:
+    if isinstance(msg, HumanMessage):
+        with st.chat_message("user"):
+            st.markdown(msg.content)
+    elif isinstance(msg, AIMessage):
+        with st.chat_message("assistant"):
+            st.markdown(msg.content)
+
+# 8. Chat Input & Response Generation
+user_prompt = st.chat_input("Ask your AI guide anything...")
+
+if user_prompt:
+    st.session_state.chat_history.append(HumanMessage(content=user_prompt))
+    with st.chat_message("user"):
+        st.markdown(user_prompt)
+
+    # Retrieve relevant context from the vector store, if available
+    context_snippet = ""
+    if vectorstore is not None:
+        relevant_docs = vectorstore.similarity_search(user_prompt, k=4)
+        if relevant_docs:
+            context_snippet = "\n\n".join(doc.page_content for doc in relevant_docs)
+
+    messages_to_send = list(st.session_state.chat_history)
+    if context_snippet:
+        messages_to_send.insert(
+            1,
+            SystemMessage(content=f"Use the following retrieved context if relevant:\n\n{context_snippet}")
+        )
+
+    with st.chat_message("assistant"):
+        with st.spinner("Thinking..."):
+            response = llm.invoke(messages_to_send)
+        st.markdown(response.content)
+
+    st.session_state.chat_history.append(AIMessage(content=response.content))
