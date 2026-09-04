@@ -1,4 +1,5 @@
 streamlit
+fastembed
 torchvision
 langchain-groq
 mistralai>=1.2.0
