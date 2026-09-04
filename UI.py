@@ -384,29 +384,22 @@ if uploaded_file is not None:
     if raw_text.strip():
         vectorstore = build_vector_store(raw_text)
 
-# One-time PDF export of the conversation transcript, shown in the sidebar
-if "pdf_download_used" not in st.session_state:
-    st.session_state.pdf_download_used = False
-
-def _mark_pdf_downloaded():
-    st.session_state.pdf_download_used = True
-
+# PDF export of the conversation transcript, shown in the sidebar — downloadable
+# any number of times, and always reflects the latest chat history since the
+# PDF bytes are regenerated fresh on each rerun.
 with st.sidebar:
     st.markdown("---")
     st.subheader("📄 Export Transcript")
     has_conversation = any(isinstance(m, HumanMessage) for m in st.session_state.chat_history)
 
-    if st.session_state.pdf_download_used:
-        st.caption("✅ PDF already downloaded this session.")
-    elif has_conversation:
+    if has_conversation:
         pdf_bytes = generate_chat_pdf(persona_option, st.session_state.chat_history)
         st.download_button(
             label="⬇️ Download Conversation as PDF",
             data=pdf_bytes,
             file_name=f"{persona_option.replace(' ', '_').replace('/', '-')}_transcript.pdf",
             mime="application/pdf",
-            on_click=_mark_pdf_downloaded,
-            key="pdf_download_once"
+            key="pdf_download_button"
         )
     else:
         st.caption("Start chatting to enable PDF export.")
