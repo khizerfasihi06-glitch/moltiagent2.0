@@ -12,6 +12,7 @@ from langchain_core.documents import Document
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet
+from pypdf import PdfReader
 
 # 1. Page Configuration
 st.set_page_config(page_title="Avatar AI Experts", page_icon="💧", layout="centered")
@@ -28,7 +29,7 @@ def init_groq_llm():
         st.stop()
 
     return ChatGroq(
-        model="openai/gpt-oss-120b",
+        model="llama-3.3-70b-versatile",
         api_key=api_key,
         max_retries=5,  # Automatically waits and backs off exponentially on 429s
         timeout=60
@@ -59,6 +60,31 @@ def build_vector_store(text_content):
         return None
     # In-memory, ephemeral Chroma collection scoped to this session's document set
     return Chroma.from_documents(docs, embeddings, collection_name="avatar_session_docs")
+
+
+def extract_text_from_upload(uploaded):
+    """Extracts plain text from an uploaded .txt, .md, or .pdf file."""
+    name = uploaded.name.lower()
+    if name.endswith(".pdf"):
+        try:
+            reader = PdfReader(uploaded)
+            return "\n".join(page.extract_text() or "" for page in reader.pages)
+        except Exception as e:
+            st.warning(f"Could not read '{uploaded.name}': {e}")
+            return ""
+    # txt / md
+    try:
+        return uploaded.getvalue().decode("utf-8")
+    except UnicodeDecodeError:
+        st.warning(f"Could not decode '{uploaded.name}' as UTF-8 text.")
+        return ""
+
+
+def count_chunks(text_content):
+    """Quick, uncached chunk count for sidebar stats (splitting text is cheap;
+       only the embedding step in build_vector_store needs caching)."""
+    splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
+    return len([c for c in splitter.split_text(text_content) if c.strip()])
 
 
 def generate_chat_pdf(persona_name, history):
@@ -361,7 +387,14 @@ with st.sidebar:
 
     st.markdown("---")
     st.subheader("📁 Context Ingestion (RAG)")
-    uploaded_file = st.file_uploader("Drop supporting files here to seed vector memory:", type=["txt", "md"])
+    uploaded_files = st.file_uploader(
+        "Drop supporting files here to seed vector memory:",
+        type=["txt", "md", "pdf"],
+        accept_multiple_files=True
+    )
+    if st.button("🗑️ Reset Knowledge Base"):
+        build_vector_store.clear()
+        st.rerun()
 
 # 5. Core Application Initialization (Session Memory Management)
 if "chat_history" not in st.session_state:
@@ -378,11 +411,16 @@ if st.session_state.chat_history and isinstance(st.session_state.chat_history[0]
 
 # Context Processing Block
 vectorstore = None
-if uploaded_file is not None:
-    stringio = io.StringIO(uploaded_file.getvalue().decode("utf-8"))
-    raw_text = stringio.read()
-    if raw_text.strip():
-        vectorstore = build_vector_store(raw_text)
+indexed_chunk_count = 0
+if uploaded_files:
+    combined_text = "\n\n".join(
+        extract_text_from_upload(f) for f in uploaded_files
+    ).strip()
+    if combined_text:
+        vectorstore = build_vector_store(combined_text)
+        indexed_chunk_count = count_chunks(combined_text)
+        with st.sidebar:
+            st.caption(f"📚 {len(uploaded_files)} file(s) indexed · {indexed_chunk_count} chunks in memory")
 
 # PDF export of the conversation transcript, shown in the sidebar — downloadable
 # any number of times, and always reflects the latest chat history since the
@@ -447,10 +485,11 @@ if user_prompt:
 
     # Retrieve relevant context from the vector store, if available
     context_snippet = ""
+    retrieved_docs = []
     if vectorstore is not None:
-        relevant_docs = vectorstore.similarity_search(user_prompt, k=4)
-        if relevant_docs:
-            context_snippet = "\n\n".join(doc.page_content for doc in relevant_docs)
+        retrieved_docs = vectorstore.similarity_search(user_prompt, k=4)
+        if retrieved_docs:
+            context_snippet = "\n\n".join(doc.page_content for doc in retrieved_docs)
 
     messages_to_send = list(st.session_state.chat_history)
     if context_snippet:
@@ -463,5 +502,12 @@ if user_prompt:
         with st.spinner("Thinking..."):
             response = llm.invoke(messages_to_send)
         st.markdown(response.content)
+        if retrieved_docs:
+            with st.expander(f"📚 Sources used from your documents ({len(retrieved_docs)})"):
+                for i, doc in enumerate(retrieved_docs, start=1):
+                    snippet = doc.page_content.strip().replace("\n", " ")
+                    if len(snippet) > 300:
+                        snippet = snippet[:300] + "…"
+                    st.markdown(f"**Excerpt {i}:** {snippet}")
 
     st.session_state.chat_history.append(AIMessage(content=response.content))
