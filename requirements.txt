@@ -1,5 +1,13 @@
 streamlit
 fastembed
+streamlit
+langchain-core
+langchain-groq
+langchain-community
+langchain-text-splitters
+chromadb
+fastembed
+reportlab
 torchvision
 langchain-groq
 mistralai>=1.2.0
