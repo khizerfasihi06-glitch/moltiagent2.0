@@ -6,9 +6,9 @@ reportlab
 matplotlib
 torchvision
 faiss-cpu
-chromadb
-fastembed
 sentence-transformers
+chromadb
+fastembed==0.2.7
 langchain-core
 langchain-groq
 langchain-community
