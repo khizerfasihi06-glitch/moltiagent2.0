@@ -28,8 +28,14 @@ def init_mistral_llm():
         st.error("Missing MISTRAL_API_KEY. Please set it in your environment variables or Streamlit secrets.")
         st.stop()
 
+    # "mistral-small-latest" is available on free/basic API tiers. Larger
+    # models like "mistral-large-latest" or "mistral-medium-latest" return a
+    # 403 "tier_not_allowed" error unless your Mistral account has billing/a
+    # higher tier enabled — bump this string once your account supports it.
+    model_name = st.secrets.get("MISTRAL_MODEL") or os.environ.get("MISTRAL_MODEL") or "mistral-small-latest"
+
     return ChatMistralAI(
-        model="mistral-large-latest",
+        model=model_name,
         api_key=api_key,
         max_retries=5,  # Automatically waits and backs off exponentially on 429s
         timeout=60
