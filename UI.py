@@ -357,7 +357,7 @@ with st.sidebar:
         ("Designer", "DSN", "shaping user-facing form, flow, and experience"),
         ("Engineer", "ENG", "building and troubleshooting technical systems"),
         ("Manager", "MGR", "coordinating people, priorities, and delivery"),
-        ("Educator", "EDC", "explaining concepts clearly for learners at any level"),
+        ("Educator", "EDC", "explaining concepts clearly for learners at any level but just like a Q/Ans"),
         ("Mentor", "MTR", "offering experience-based guidance and encouragement"),
         ("Auditor", "AUD", "reviewing processes for accuracy, risk, and compliance"),
         ("Developer", "DEV", "building functional, maintainable technical solutions"),
