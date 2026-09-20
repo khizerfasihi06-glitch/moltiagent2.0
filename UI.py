@@ -497,16 +497,27 @@ if user_prompt:
         if retrieved_docs:
             context_snippet = "\n\n".join(doc.page_content for doc in retrieved_docs)
 
+    # Build the outgoing message list with a SINGLE leading system message.
+    # Some Mistral API versions reject requests containing more than one
+    # system-role message, so any RAG context is merged into the existing
+    # persona system message rather than inserted as a second one.
     messages_to_send = list(st.session_state.chat_history)
-    if context_snippet:
-        messages_to_send.insert(
-            1,
-            SystemMessage(content=f"Use the following retrieved context if relevant:\n\n{context_snippet}")
+    if context_snippet and messages_to_send and isinstance(messages_to_send[0], SystemMessage):
+        merged_system = SystemMessage(
+            content=messages_to_send[0].content
+            + f"\n\nUse the following retrieved context if relevant:\n\n{context_snippet}"
         )
+        messages_to_send = [merged_system] + messages_to_send[1:]
 
     with st.chat_message("assistant"):
         with st.spinner("Thinking..."):
-            response = llm.invoke(messages_to_send)
+            try:
+                response = llm.invoke(messages_to_send)
+            except Exception as e:
+                # Streamlit Cloud redacts exception details by default; surface
+                # the real error inline so it's actually debuggable.
+                st.error(f"The model call failed: {e}")
+                st.stop()
         st.markdown(response.content)
         if retrieved_docs:
             with st.expander(f"📚 Sources used from your documents ({len(retrieved_docs)})"):
