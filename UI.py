@@ -6,7 +6,7 @@ import httpx
 import streamlit as st
 import streamlit.components.v1 as components
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
-from langchain_mistralai import ChatMistralAI
+from langchain_cloudflare.chat_models import ChatCloudflareWorkersAI
 from langchain_community.embeddings import FastEmbedEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import Chroma
@@ -19,28 +19,37 @@ from pypdf import PdfReader
 # 1. Page Configuration
 st.set_page_config(page_title="Avatar AI Experts", page_icon="💧", layout="centered")
 
-# 2. Optimized & Cached Mistral / LangChain Initializers (Prevents 429 Errors)
+# 2. Optimized & Cached Cloudflare Workers AI / LangChain Initializers (Prevents 429 Errors)
 @st.cache_resource
-def init_mistral_llm():
+def init_cloudflare_llm():
     """Initializes and caches the chat model.
        Implements automatic backoff retries on rate limits (429s)."""
     # Fallback to streamlit secrets or environment variables
-    api_key = st.secrets.get("MISTRAL_API_KEY") or os.environ.get("MISTRAL_API_KEY")
-    if not api_key:
-        st.error("Missing MISTRAL_API_KEY. Please set it in your environment variables or Streamlit secrets.")
+    api_token = st.secrets.get("CF_AI_API_KEY") or os.environ.get("CF_AI_API_KEY")
+    account_id = st.secrets.get("CF_ACCOUNT_ID") or os.environ.get("CF_ACCOUNT_ID")
+    if not api_token or not account_id:
+        st.error(
+            "Missing CF_AI_API_KEY and/or CF_ACCOUNT_ID. Please set both in your "
+            "environment variables or Streamlit secrets."
+        )
         st.stop()
 
-    # "mistral-small-latest" is available on free/basic API tiers. Larger
-    # models like "mistral-large-latest" or "mistral-medium-latest" return a
-    # 403 "tier_not_allowed" error unless your Mistral account has billing/a
-    # higher tier enabled — bump this string once your account supports it.
-    model_name = st.secrets.get("MISTRAL_MODEL") or os.environ.get("MISTRAL_MODEL") or "mistral-small-latest"
+    # "@cf/meta/llama-3.3-70b-instruct-fp8-fast" is a solid free-tier default.
+    # Browse other free Workers AI text-generation models at
+    # developers.cloudflare.com/workers-ai/models/ and override via
+    # CF_AI_MODEL if you want to try a different one.
+    model_name = (
+        st.secrets.get("CF_AI_MODEL")
+        or os.environ.get("CF_AI_MODEL")
+        or "@cf/meta/llama-3.3-70b-instruct-fp8-fast"
+    )
 
-    return ChatMistralAI(
+    return ChatCloudflareWorkersAI(
         model=model_name,
-        api_key=api_key,
-        max_retries=5,  # Automatically waits and backs off exponentially on 429s
-        timeout=60
+        api_token=api_token,
+        account_id=account_id,
+        temperature=0,
+        max_tokens=1024,
     )
 
 @st.cache_resource
@@ -54,7 +63,7 @@ def init_embeddings():
     return FastEmbedEmbeddings(model_name="BAAI/bge-small-en-v1.5")
 
 # Instantiate the cached singletons
-llm = init_mistral_llm()
+llm = init_cloudflare_llm()
 embeddings = init_embeddings()
 
 @st.cache_resource(show_spinner="Analyzing documents and generating vector space...")
@@ -122,8 +131,9 @@ def generate_chat_pdf(persona_name, history):
 
 def invoke_with_rate_limit_retry(llm, messages, max_attempts=4, base_delay=3):
     """Calls llm.invoke, retrying on HTTP 429s with exponential backoff.
-       ChatMistralAI's own max_retries only covers connection/timeout errors,
-       not HTTP status errors like 429, so that case is handled here instead."""
+       Provider client libraries' own max_retries typically only cover
+       connection/timeout errors, not HTTP status errors like 429, so that
+       case is handled here instead."""
     last_error = None
     for attempt in range(max_attempts):
         try:
@@ -537,9 +547,9 @@ if user_prompt:
             except httpx.HTTPStatusError as e:
                 if e.response is not None and e.response.status_code == 429:
                     st.error(
-                        "Mistral's rate limit (or your free-tier quota) was hit and retries were "
-                        "exhausted. Wait a bit before trying again, or check your usage/limits at "
-                        "console.mistral.ai."
+                        "Cloudflare Workers AI's rate limit (or daily Neurons quota) was hit and "
+                        "retries were exhausted. Wait a bit before trying again, or check your usage "
+                        "at dash.cloudflare.com under Workers AI."
                     )
                 else:
                     st.error(f"The model call failed: {e}")
