@@ -1,6 +1,8 @@
 import os
 import io
 import re
+import time
+import httpx
 import streamlit as st
 import streamlit.components.v1 as components
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
@@ -116,6 +118,25 @@ def generate_chat_pdf(persona_name, history):
     doc.build(story)
     buffer.seek(0)
     return buffer.getvalue()
+
+
+def invoke_with_rate_limit_retry(llm, messages, max_attempts=4, base_delay=3):
+    """Calls llm.invoke, retrying on HTTP 429s with exponential backoff.
+       ChatMistralAI's own max_retries only covers connection/timeout errors,
+       not HTTP status errors like 429, so that case is handled here instead."""
+    last_error = None
+    for attempt in range(max_attempts):
+        try:
+            return llm.invoke(messages)
+        except httpx.HTTPStatusError as e:
+            last_error = e
+            if e.response is not None and e.response.status_code == 429 and attempt < max_attempts - 1:
+                delay = base_delay * (2 ** attempt)
+                st.toast(f"Rate limited by Mistral — retrying in {delay}s…")
+                time.sleep(delay)
+                continue
+            raise
+    raise last_error
 
 
 # 3. CSS Styling System ("Boarding Pass")
@@ -512,7 +533,17 @@ if user_prompt:
     with st.chat_message("assistant"):
         with st.spinner("Thinking..."):
             try:
-                response = llm.invoke(messages_to_send)
+                response = invoke_with_rate_limit_retry(llm, messages_to_send)
+            except httpx.HTTPStatusError as e:
+                if e.response is not None and e.response.status_code == 429:
+                    st.error(
+                        "Mistral's rate limit (or your free-tier quota) was hit and retries were "
+                        "exhausted. Wait a bit before trying again, or check your usage/limits at "
+                        "console.mistral.ai."
+                    )
+                else:
+                    st.error(f"The model call failed: {e}")
+                st.stop()
             except Exception as e:
                 # Streamlit Cloud redacts exception details by default; surface
                 # the real error inline so it's actually debuggable.
