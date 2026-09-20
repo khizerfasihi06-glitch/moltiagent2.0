@@ -4,7 +4,7 @@ import re
 import streamlit as st
 import streamlit.components.v1 as components
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
-from langchain_groq import ChatGroq
+from langchain_mistralai import ChatMistralAI
 from langchain_community.embeddings import FastEmbedEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import Chroma
@@ -17,19 +17,19 @@ from pypdf import PdfReader
 # 1. Page Configuration
 st.set_page_config(page_title="Avatar AI Experts", page_icon="💧", layout="centered")
 
-# 2. Optimized & Cached Groq / LangChain Initializers (Prevents 429 Errors)
+# 2. Optimized & Cached Mistral / LangChain Initializers (Prevents 429 Errors)
 @st.cache_resource
-def init_groq_llm():
+def init_mistral_llm():
     """Initializes and caches the chat model.
        Implements automatic backoff retries on rate limits (429s)."""
     # Fallback to streamlit secrets or environment variables
-    api_key = st.secrets.get("GROQ_API_KEY") or os.environ.get("GROQ_API_KEY")
+    api_key = st.secrets.get("MISTRAL_API_KEY") or os.environ.get("MISTRAL_API_KEY")
     if not api_key:
-        st.error("Missing GROQ_API_KEY. Please set it in your environment variables or Streamlit secrets.")
+        st.error("Missing MISTRAL_API_KEY. Please set it in your environment variables or Streamlit secrets.")
         st.stop()
 
-    return ChatGroq(
-        model="openai/gpt-oss-120b",
+    return ChatMistralAI(
+        model="mistral-large-latest",
         api_key=api_key,
         max_retries=5,  # Automatically waits and backs off exponentially on 429s
         timeout=60
@@ -38,15 +38,15 @@ def init_groq_llm():
 @st.cache_resource
 def init_embeddings():
     """Initializes and caches the text embedding layer.
-       Groq does not currently offer an embeddings endpoint, so we use
-       FastEmbed — a lightweight, ONNX-based local embedding model with no
-       torch/transformers dependency. This keeps RAG fully functional
-       without a second API key and avoids heavy ML-stack install issues
-       (e.g. the torchvision import error some transformers versions hit)."""
+       We use FastEmbed — a lightweight, ONNX-based local embedding model with no
+       torch/transformers dependency — so RAG works fully offline without
+       relying on Mistral's embeddings endpoint or a second API key, and
+       avoids heavy ML-stack install issues (e.g. the torchvision import
+       error some transformers versions hit)."""
     return FastEmbedEmbeddings(model_name="BAAI/bge-small-en-v1.5")
 
 # Instantiate the cached singletons
-llm = init_groq_llm()
+llm = init_mistral_llm()
 embeddings = init_embeddings()
 
 @st.cache_resource(show_spinner="Analyzing documents and generating vector space...")
