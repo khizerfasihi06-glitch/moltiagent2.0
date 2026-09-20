@@ -336,7 +336,7 @@ with st.sidebar:
         ("Aerospace", "AER"), ("Telecommunications", "TEL"), ("Insurance", "INS"), ("Banking", "BNK"),
         ("Nonprofit", "NPO"), ("Government", "GOV"), ("Media", "MED"), ("Entertainment", "ENT"),
         ("Sports", "SPT"), ("Fashion", "FSH"), ("Food & Beverage", "FNB"), ("Environmental", "ENV"),
-        ("Cybersecurity", "CYB"), ("Artificial Intelligence", "AIX"), ("Blockchain", "BLK"),
+        ("Cybersecurity", "CYB"),("Cloud Computing", "CC"),("Artificial Intelligence", "AIX"), ("Blockchain", "BLK"),
         ("Biotechnology", "BIO"), ("Pharmaceuticals", "PHM"), ("Mental Health", "MHL"), ("Fitness", "FIT"),
         ("Nutrition", "NUT"), ("Travel", "TRV"), ("Music", "MUS"), ("Film", "FLM"), ("Publishing", "PUB"),
         ("Architecture", "ARC"), ("Interior Design", "INT"), ("Urban Planning", "URB"),
