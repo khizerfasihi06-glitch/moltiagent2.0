@@ -7,6 +7,9 @@ import streamlit as st
 import streamlit.components.v1 as components
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_groq import ChatGroq
+from langchain_openai import ChatOpenAI
+from langchain_mistralai import ChatMistralAI
 from langchain_community.embeddings import FastEmbedEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import Chroma
@@ -19,16 +22,17 @@ from pypdf import PdfReader
 # 1. Page Configuration
 st.set_page_config(page_title="Avatar AI Experts", page_icon="💧", layout="centered")
 
-# 2. Optimized & Cached Google Gemini / LangChain Initializers (Prevents 429 Errors)
+# 2. Optimized & Cached LLM Initializers, with a 4-provider Fallback Chain
+#    (Gemini -> Groq -> OpenAI -> Mistral) so no single 429/quota error
+#    takes the whole app down.
 @st.cache_resource
 def init_gemini_llm():
-    """Initializes and caches the chat model.
-       Implements automatic backoff retries on rate limits (429s)."""
-    # Fallback to streamlit secrets or environment variables
+    """Initializes and caches the Gemini chat model.
+       Returns None if no Gemini key is configured, so the app can still run
+       on whichever other providers are configured."""
     api_key = st.secrets.get("GOOGLE_API_KEY") or os.environ.get("GOOGLE_API_KEY")
     if not api_key:
-        st.error("Missing GOOGLE_API_KEY. Please set it in your environment variables or Streamlit secrets.")
-        st.stop()
+        return None
 
     # "gemini-flash-latest" is a rolling alias Google keeps pointed at its
     # newest GA Flash model (currently Gemini 3.5 Flash, released May 2026),
@@ -44,6 +48,92 @@ def init_gemini_llm():
         timeout=60
     )
 
+
+@st.cache_resource
+def init_groq_llm():
+    """Initializes and caches the Groq chat model.
+       Returns None if no Groq key is configured, so the app can still run
+       on whichever other providers are configured."""
+    api_key = st.secrets.get("GROQ_API_KEY") or os.environ.get("GROQ_API_KEY")
+    if not api_key:
+        return None
+
+    model_name = st.secrets.get("GROQ_MODEL") or os.environ.get("GROQ_MODEL") or "openai/gpt-oss-120b"
+
+    return ChatGroq(
+        model=model_name,
+        api_key=api_key,
+        max_retries=5,
+        timeout=60
+    )
+
+
+@st.cache_resource
+def init_openai_llm():
+    """Initializes and caches the OpenAI chat model.
+       Returns None if no OpenAI key is configured, so the app can still run
+       on whichever other providers are configured."""
+    api_key = st.secrets.get("OPENAI_API_KEY") or os.environ.get("OPENAI_API_KEY")
+    if not api_key:
+        return None
+
+    # "gpt-5-mini" is OpenAI's current cost-efficient, general-purpose model.
+    # Override via OPENAI_MODEL (e.g. "gpt-5.4-mini" or a flagship model) if
+    # your account has access to something newer/larger.
+    model_name = st.secrets.get("OPENAI_MODEL") or os.environ.get("OPENAI_MODEL") or "gpt-5-mini"
+
+    return ChatOpenAI(
+        model=model_name,
+        api_key=api_key,
+        max_retries=5,
+        timeout=60
+    )
+
+
+@st.cache_resource
+def init_mistral_llm():
+    """Initializes and caches the Mistral chat model.
+       Returns None if no Mistral key is configured, so the app can still run
+       on whichever other providers are configured."""
+    api_key = st.secrets.get("MISTRAL_API_KEY") or os.environ.get("MISTRAL_API_KEY")
+    if not api_key:
+        return None
+
+    # "mistral-small-latest" is available on free/basic API tiers. Larger
+    # models like "mistral-large-latest" return a 403 "tier_not_allowed"
+    # error unless your account has billing/a higher tier enabled — bump
+    # this via MISTRAL_MODEL once your account supports it.
+    model_name = st.secrets.get("MISTRAL_MODEL") or os.environ.get("MISTRAL_MODEL") or "mistral-small-latest"
+
+    return ChatMistralAI(
+        model=model_name,
+        api_key=api_key,
+        max_retries=5,
+        timeout=60
+    )
+
+
+def get_llm_chain():
+    """Returns the configured LLMs in fallback order:
+       Gemini -> Groq -> OpenAI -> Mistral.
+       At least one of GOOGLE_API_KEY / GROQ_API_KEY / OPENAI_API_KEY /
+       MISTRAL_API_KEY must be set; any subset works, in that priority order."""
+    chain = [
+        ("Gemini", init_gemini_llm()),
+        ("Groq", init_groq_llm()),
+        ("OpenAI", init_openai_llm()),
+        ("Mistral", init_mistral_llm()),
+    ]
+    chain = [(name, model) for name, model in chain if model is not None]
+    if not chain:
+        st.error(
+            "No LLM is configured. Set at least one of GOOGLE_API_KEY (Gemini), "
+            "GROQ_API_KEY (Groq), OPENAI_API_KEY (OpenAI), or MISTRAL_API_KEY (Mistral) "
+            "in your environment variables or Streamlit secrets."
+        )
+        st.stop()
+    return chain
+
 @st.cache_resource
 def init_embeddings():
     """Initializes and caches the text embedding layer.
@@ -55,7 +145,7 @@ def init_embeddings():
     return FastEmbedEmbeddings(model_name="BAAI/bge-small-en-v1.5")
 
 # Instantiate the cached singletons
-llm = init_gemini_llm()
+llm_chain = get_llm_chain()  # [("Gemini", llm_obj), ("Groq", llm_obj)] in fallback order
 embeddings = init_embeddings()
 
 @st.cache_resource(show_spinner="Analyzing documents and generating vector space...")
@@ -144,28 +234,53 @@ def invoke_with_rate_limit_retry(llm, messages, max_attempts=4, base_delay=3):
     """Calls llm.invoke, retrying on rate-limit errors with exponential backoff.
        Provider client libraries' own max_retries typically only cover
        connection/timeout errors, not rate-limit errors, so that case is
-       handled here instead. Google's SDK raises ResourceExhausted (rather
-       than a generic httpx.HTTPStatusError) for 429s, so we detect it by
-       message content to stay resilient to whichever exception type the
-       currently-configured provider uses."""
+       handled here instead. Different providers raise different exception
+       types for 429s (e.g. Google's ResourceExhausted vs. an
+       httpx.HTTPStatusError), so this detects it by message content to stay
+       resilient across whichever provider is currently in use."""
     last_error = None
     for attempt in range(max_attempts):
         try:
             return llm.invoke(messages)
         except Exception as e:
             last_error = e
-            is_rate_limit = (
-                "429" in str(e)
-                or "ResourceExhausted" in type(e).__name__
-                or "rate limit" in str(e).lower()
-                or "quota" in str(e).lower()
-            )
-            if is_rate_limit and attempt < max_attempts - 1:
+            if is_rate_limit_error(e) and attempt < max_attempts - 1:
                 delay = base_delay * (2 ** attempt)
-                st.toast(f"Rate limited by Gemini — retrying in {delay}s…")
+                st.toast(f"Rate limited — retrying in {delay}s…")
                 time.sleep(delay)
                 continue
             raise
+    raise last_error
+
+
+def is_rate_limit_error(e):
+    return (
+        "429" in str(e)
+        or "ResourceExhausted" in type(e).__name__
+        or "rate limit" in str(e).lower()
+        or "rate_limited" in str(e).lower()
+        or "quota" in str(e).lower()
+    )
+
+
+def invoke_with_fallback(chain, messages, max_attempts=4, base_delay=3):
+    """Tries each (name, llm) in the fallback chain in order. Within a
+       provider, rate-limit errors are retried with backoff via
+       invoke_with_rate_limit_retry; if a provider's retries are exhausted,
+       or it fails for any other reason, the next provider in the chain is
+       tried instead. Raises the last error if every provider fails, and
+       shows a toast when it actually falls over to a different provider so
+       the switch isn't silent."""
+    last_error = None
+    for i, (name, model) in enumerate(chain):
+        try:
+            result = invoke_with_rate_limit_retry(model, messages, max_attempts=max_attempts, base_delay=base_delay)
+            if i > 0:
+                st.toast(f"Switched to {name} after the earlier provider failed.")
+            return result
+        except Exception as e:
+            last_error = e
+            continue
     raise last_error
 
 
@@ -563,19 +678,14 @@ if user_prompt:
     with st.chat_message("assistant"):
         with st.spinner("Thinking..."):
             try:
-                response = invoke_with_rate_limit_retry(llm, messages_to_send)
+                response = invoke_with_fallback(llm_chain, messages_to_send)
             except Exception as e:
-                is_rate_limit = (
-                    "429" in str(e)
-                    or "ResourceExhausted" in type(e).__name__
-                    or "rate limit" in str(e).lower()
-                    or "quota" in str(e).lower()
-                )
-                if is_rate_limit:
+                if is_rate_limit_error(e):
                     st.error(
-                        "Gemini's rate limit (or your free-tier daily quota) was hit and retries "
-                        "were exhausted. Wait a bit before trying again, or check your usage at "
-                        "aistudio.google.com."
+                        "All configured providers hit their rate limit or quota, and retries were "
+                        "exhausted. Wait a bit before trying again, or check usage at "
+                        "aistudio.google.com (Gemini) / console.groq.com (Groq) / "
+                        "platform.openai.com (OpenAI) / console.mistral.ai (Mistral)."
                     )
                 else:
                     # Streamlit Cloud redacts exception details by default; surface
