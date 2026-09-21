@@ -121,6 +121,25 @@ def generate_chat_pdf(persona_name, history):
     return buffer.getvalue()
 
 
+def extract_response_text(content):
+    """Normalizes an LLM response's .content into plain text.
+       Gemini 3 models return content as a list of blocks (a text block plus
+       an internal 'thinking' signature block) rather than a plain string,
+       so this pulls out just the text parts regardless of provider shape."""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts = []
+        for block in content:
+            if isinstance(block, dict):
+                if block.get("type") == "text":
+                    parts.append(block.get("text", ""))
+            elif isinstance(block, str):
+                parts.append(block)
+        return "".join(parts)
+    return str(content)
+
+
 def invoke_with_rate_limit_retry(llm, messages, max_attempts=4, base_delay=3):
     """Calls llm.invoke, retrying on rate-limit errors with exponential backoff.
        Provider client libraries' own max_retries typically only cover
@@ -563,7 +582,8 @@ if user_prompt:
                     # the real error inline so it's actually debuggable.
                     st.error(f"The model call failed: {e}")
                 st.stop()
-        st.markdown(response.content)
+        response_text = extract_response_text(response.content)
+        st.markdown(response_text)
         if retrieved_docs:
             with st.expander(f"📚 Sources used from your documents ({len(retrieved_docs)})"):
                 for i, doc in enumerate(retrieved_docs, start=1):
@@ -572,4 +592,4 @@ if user_prompt:
                         snippet = snippet[:300] + "…"
                     st.markdown(f"**Excerpt {i}:** {snippet}")
 
-    st.session_state.chat_history.append(AIMessage(content=response.content))
+    st.session_state.chat_history.append(AIMessage(content=response_text))
