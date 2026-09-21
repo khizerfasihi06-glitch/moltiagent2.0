@@ -6,7 +6,7 @@ import httpx
 import streamlit as st
 import streamlit.components.v1 as components
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
-from langchain_cloudflare.chat_models import ChatCloudflareWorkersAI
+from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_community.embeddings import FastEmbedEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import Chroma
@@ -19,37 +19,29 @@ from pypdf import PdfReader
 # 1. Page Configuration
 st.set_page_config(page_title="Avatar AI Experts", page_icon="💧", layout="centered")
 
-# 2. Optimized & Cached Cloudflare Workers AI / LangChain Initializers (Prevents 429 Errors)
+# 2. Optimized & Cached Google Gemini / LangChain Initializers (Prevents 429 Errors)
 @st.cache_resource
-def init_cloudflare_llm():
+def init_gemini_llm():
     """Initializes and caches the chat model.
        Implements automatic backoff retries on rate limits (429s)."""
     # Fallback to streamlit secrets or environment variables
-    api_token = st.secrets.get("CF_AI_API_KEY") or os.environ.get("CF_AI_API_KEY")
-    account_id = st.secrets.get("CF_ACCOUNT_ID") or os.environ.get("CF_ACCOUNT_ID")
-    if not api_token or not account_id:
-        st.error(
-            "Missing CF_AI_API_KEY and/or CF_ACCOUNT_ID. Please set both in your "
-            "environment variables or Streamlit secrets."
-        )
+    api_key = st.secrets.get("GOOGLE_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+    if not api_key:
+        st.error("Missing GOOGLE_API_KEY. Please set it in your environment variables or Streamlit secrets.")
         st.stop()
 
-    # "@cf/meta/llama-3.3-70b-instruct-fp8-fast" is a solid free-tier default.
-    # Browse other free Workers AI text-generation models at
-    # developers.cloudflare.com/workers-ai/models/ and override via
-    # CF_AI_MODEL if you want to try a different one.
-    model_name = (
-        st.secrets.get("CF_AI_MODEL")
-        or os.environ.get("CF_AI_MODEL")
-        or "@cf/meta/llama-3.3-70b-instruct-fp8-fast"
-    )
+    # "gemini-flash-latest" is a rolling alias Google keeps pointed at its
+    # newest GA Flash model (currently Gemini 3.5 Flash, released May 2026),
+    # so this stays current without needing manual updates. Pin an explicit
+    # version instead (e.g. "gemini-2.5-flash") via GEMINI_MODEL if you need
+    # stable, unmoving behavior for production.
+    model_name = st.secrets.get("GEMINI_MODEL") or os.environ.get("GEMINI_MODEL") or "gemini-flash-latest"
 
-    return ChatCloudflareWorkersAI(
+    return ChatGoogleGenerativeAI(
         model=model_name,
-        api_token=api_token,
-        account_id=account_id,
-        temperature=0,
-        max_tokens=1024,
+        google_api_key=api_key,
+        max_retries=5,  # Automatically waits and backs off exponentially on connection errors
+        timeout=60
     )
 
 @st.cache_resource
@@ -63,7 +55,7 @@ def init_embeddings():
     return FastEmbedEmbeddings(model_name="BAAI/bge-small-en-v1.5")
 
 # Instantiate the cached singletons
-llm = init_cloudflare_llm()
+llm = init_gemini_llm()
 embeddings = init_embeddings()
 
 @st.cache_resource(show_spinner="Analyzing documents and generating vector space...")
@@ -130,19 +122,28 @@ def generate_chat_pdf(persona_name, history):
 
 
 def invoke_with_rate_limit_retry(llm, messages, max_attempts=4, base_delay=3):
-    """Calls llm.invoke, retrying on HTTP 429s with exponential backoff.
+    """Calls llm.invoke, retrying on rate-limit errors with exponential backoff.
        Provider client libraries' own max_retries typically only cover
-       connection/timeout errors, not HTTP status errors like 429, so that
-       case is handled here instead."""
+       connection/timeout errors, not rate-limit errors, so that case is
+       handled here instead. Google's SDK raises ResourceExhausted (rather
+       than a generic httpx.HTTPStatusError) for 429s, so we detect it by
+       message content to stay resilient to whichever exception type the
+       currently-configured provider uses."""
     last_error = None
     for attempt in range(max_attempts):
         try:
             return llm.invoke(messages)
-        except httpx.HTTPStatusError as e:
+        except Exception as e:
             last_error = e
-            if e.response is not None and e.response.status_code == 429 and attempt < max_attempts - 1:
+            is_rate_limit = (
+                "429" in str(e)
+                or "ResourceExhausted" in type(e).__name__
+                or "rate limit" in str(e).lower()
+                or "quota" in str(e).lower()
+            )
+            if is_rate_limit and attempt < max_attempts - 1:
                 delay = base_delay * (2 ** attempt)
-                st.toast(f"Rate limited by Mistral — retrying in {delay}s…")
+                st.toast(f"Rate limited by Gemini — retrying in {delay}s…")
                 time.sleep(delay)
                 continue
             raise
@@ -544,20 +545,23 @@ if user_prompt:
         with st.spinner("Thinking..."):
             try:
                 response = invoke_with_rate_limit_retry(llm, messages_to_send)
-            except httpx.HTTPStatusError as e:
-                if e.response is not None and e.response.status_code == 429:
+            except Exception as e:
+                is_rate_limit = (
+                    "429" in str(e)
+                    or "ResourceExhausted" in type(e).__name__
+                    or "rate limit" in str(e).lower()
+                    or "quota" in str(e).lower()
+                )
+                if is_rate_limit:
                     st.error(
-                        "Cloudflare Workers AI's rate limit (or daily Neurons quota) was hit and "
-                        "retries were exhausted. Wait a bit before trying again, or check your usage "
-                        "at dash.cloudflare.com under Workers AI."
+                        "Gemini's rate limit (or your free-tier daily quota) was hit and retries "
+                        "were exhausted. Wait a bit before trying again, or check your usage at "
+                        "aistudio.google.com."
                     )
                 else:
+                    # Streamlit Cloud redacts exception details by default; surface
+                    # the real error inline so it's actually debuggable.
                     st.error(f"The model call failed: {e}")
-                st.stop()
-            except Exception as e:
-                # Streamlit Cloud redacts exception details by default; surface
-                # the real error inline so it's actually debuggable.
-                st.error(f"The model call failed: {e}")
                 st.stop()
         st.markdown(response.content)
         if retrieved_docs:
