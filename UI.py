@@ -270,14 +270,14 @@ def invoke_with_fallback(chain, messages, max_attempts=4, base_delay=3):
        or it fails for any other reason, the next provider in the chain is
        tried instead. Raises the last error if every provider fails, and
        shows a toast when it actually falls over to a different provider so
-       the switch isn't silent."""
+       the switch isn't silent. Returns (response, provider_name)."""
     last_error = None
     for i, (name, model) in enumerate(chain):
         try:
             result = invoke_with_rate_limit_retry(model, messages, max_attempts=max_attempts, base_delay=base_delay)
             if i > 0:
                 st.toast(f"Switched to {name} after the earlier provider failed.")
-            return result
+            return result, name
         except Exception as e:
             last_error = e
             continue
@@ -558,6 +558,22 @@ with st.sidebar:
     config = persona_configs[persona_option]
 
     st.markdown("---")
+    st.subheader("🧠 Model Engine")
+    provider_names = [name for name, _ in llm_chain]
+    engine_options = ["Auto (fallback chain)"] + provider_names
+    engine_choice = st.selectbox(
+        "Choose which AI answers you:",
+        engine_options,
+        help=(
+            "Auto tries each configured provider in order (Gemini → Groq → OpenAI → "
+            "Mistral) and falls back automatically if one hits a rate limit or error. "
+            "Picking a specific provider tries that one first, still falling back to "
+            "the others if it fails."
+        )
+    )
+    st.caption(f"Configured providers: {', '.join(provider_names) if provider_names else 'none'}")
+
+    st.markdown("---")
     st.subheader("📁 Context Ingestion (RAG)")
     uploaded_files = st.file_uploader(
         "Drop supporting files here to seed vector memory:",
@@ -567,6 +583,14 @@ with st.sidebar:
     if st.button("🗑️ Reset Knowledge Base"):
         build_vector_store.clear()
         st.rerun()
+
+# Reorder the fallback chain so the sidebar's chosen engine (if any) goes
+# first; the rest remain as automatic fallbacks if the chosen one fails.
+if engine_choice != "Auto (fallback chain)":
+    active_llm_chain = [pair for pair in llm_chain if pair[0] == engine_choice] + \
+                        [pair for pair in llm_chain if pair[0] != engine_choice]
+else:
+    active_llm_chain = llm_chain
 
 # 5. Core Application Initialization (Session Memory Management)
 if "chat_history" not in st.session_state:
@@ -678,7 +702,7 @@ if user_prompt:
     with st.chat_message("assistant"):
         with st.spinner("Thinking..."):
             try:
-                response = invoke_with_fallback(llm_chain, messages_to_send)
+                response = invoke_with_fallback(active_llm_chain, messages_to_send)
             except Exception as e:
                 if is_rate_limit_error(e):
                     st.error(
