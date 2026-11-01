@@ -1,13 +1,23 @@
-streamlit
-langchain-core
-langchain-community
-langchain-text-splitters
-langchain-google-genai
-langchain-groq
-langchain-openai
-langchain-mistralai
-fastembed
-chromadb
-reportlab
-pypdf
-httpx
+# UI (>=1.39 is needed for st.audio_input)
+streamlit>=1.39.0
+
+# LangChain core + providers
+langchain-core>=0.3.0
+langchain-community>=0.3.0
+langchain-text-splitters>=0.3.0
+langchain-google-genai>=2.0.0
+langchain-groq>=0.2.0
+langchain-openai>=0.2.0
+langchain-mistralai>=0.2.0
+
+# Vector store + local embeddings (RAG)
+chromadb>=0.5.0
+fastembed>=0.4.0
+
+# Voice transcription clients (Whisper via Groq / OpenAI)
+groq>=0.11.0
+openai>=1.50.0
+
+# PDF read / export
+pypdf>=4.0.0
+reportlab>=4.0.0
