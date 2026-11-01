@@ -37,15 +37,17 @@ def _secret(name, default=None):
 
 
 # 2. Cached Groq LLM initializer
+GROQ_API_KEY = _secret("GROQ_API_KEY")
+if not GROQ_API_KEY:
+    st.error("GROQ_API_KEY is not set. Add it to your environment variables or Streamlit secrets.")
+    st.stop()
+
+
 @st.cache_resource
-def init_groq_llm():
-    """Initializes and caches the Groq chat model (the only provider used)."""
-    api_key = _secret("GROQ_API_KEY")
-    if not api_key:
-        st.error("GROQ_API_KEY is not set. Add it to your environment variables or Streamlit secrets.")
-        st.stop()
-    model_name = _secret("GROQ_MODEL", "openai/gpt-oss-120b")
-    return ChatGroq(model=model_name, api_key=api_key, max_retries=5, timeout=60), model_name
+def init_groq_llm(model_name, max_tokens):
+    """Initializes and caches a Groq chat model for a given model + reply cap.
+       max_tokens matters: Groq counts it toward the tokens-per-minute limit."""
+    return ChatGroq(model=model_name, api_key=GROQ_API_KEY, max_tokens=max_tokens, max_retries=5, timeout=60)
 
 
 @st.cache_resource
@@ -54,7 +56,6 @@ def init_embeddings():
     return FastEmbedEmbeddings(model_name="BAAI/bge-small-en-v1.5")
 
 
-llm, groq_model_name = init_groq_llm()
 embeddings = init_embeddings()
 
 
@@ -63,7 +64,7 @@ def build_vector_store(text_content):
     """Chunks text and builds an in-memory Chroma collection. The collection
        name is derived from the content hash so different document sets never
        get mixed into the same collection."""
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=800, chunk_overlap=150)
     docs = [Document(page_content=x) for x in text_splitter.split_text(text_content) if x.strip()]
     if not docs:
         return None
@@ -88,7 +89,7 @@ def extract_text_from_upload(uploaded):
 
 
 def count_chunks(text_content):
-    splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
+    splitter = RecursiveCharacterTextSplitter(chunk_size=800, chunk_overlap=150)
     return len([c for c in splitter.split_text(text_content) if c.strip()])
 
 
@@ -140,6 +141,44 @@ def is_rate_limit_error(e):
         or "rate_limited" in msg
         or "quota" in msg
     )
+
+
+def is_too_large_error(e):
+    msg = str(e).lower()
+    return "413" in msg or "request too large" in msg or "reduce your message size" in msg
+
+
+def est_tokens(text):
+    """Rough, deliberately conservative token estimate (~3 chars per token)."""
+    return len(text) // 3 + 1
+
+
+def trim_messages(system_text, history, budget):
+    """Builds [system] + the most recent messages that fit in `budget`
+       (estimated tokens, system text included). The newest message is always
+       kept, truncated if it alone is too big."""
+    used = est_tokens(system_text)
+    kept = []
+    for m in reversed(history):
+        text = m.content if isinstance(m.content, str) else str(m.content)
+        cost = est_tokens(text)
+        if not kept:
+            room = max(budget - used, 300)
+            if cost > room:
+                text = text[: room * 3] + " …[truncated]"
+                m = type(m)(content=text)
+                cost = est_tokens(text)
+            kept.append(m)
+            used += cost
+            continue
+        if used + cost > budget:
+            break
+        kept.append(m)
+        used += cost
+    kept.reverse()
+    while len(kept) > 1 and not isinstance(kept[0], HumanMessage):
+        kept.pop(0)
+    return [SystemMessage(content=system_text)] + kept
 
 
 def invoke_with_rate_limit_retry(llm, messages, max_attempts=4, base_delay=3):
@@ -799,8 +838,19 @@ with st.sidebar:
 
     # ---- Model ----
     st.markdown("---")
-    st.subheader("🧠 Model")
-    st.caption(f"Powered by Groq · `{groq_model_name}`")
+    st.subheader("🧠 Model (Groq)")
+    _default_model = _secret("GROQ_MODEL", "openai/gpt-oss-120b")
+    _model_options = list(dict.fromkeys([
+        _default_model, "openai/gpt-oss-120b", "openai/gpt-oss-20b",
+        "llama-3.3-70b-versatile", "llama-3.1-8b-instant",
+    ]))
+    model_choice = st.selectbox("Groq model:", _model_options)
+    max_reply_tokens = st.slider("Max reply length (tokens)", 256, 4000, 1500, 50,
+                                 help="Counted toward Groq's per-minute token limit, so lower = safer on the free tier.")
+    context_budget = st.slider("Context sent per request (tokens)", 1000, 8000, 3500, 250,
+                               help="Older messages are dropped automatically to stay under this budget.")
+    st.caption("Free-tier Groq models have a tokens-per-minute cap. If you see a 413 'request too large' "
+               "error, lower these sliders or pick another model.")
 
     # ---- RAG ----
     st.markdown("---")
@@ -915,42 +965,67 @@ if user_prompt:
     context_snippet = ""
     retrieved_docs = []
     if vectorstore is not None:
-        retrieved_docs = vectorstore.similarity_search(user_prompt, k=4)
+        retrieved_docs = vectorstore.similarity_search(user_prompt, k=3)
         if retrieved_docs:
             context_snippet = "\n\n".join(doc.page_content for doc in retrieved_docs)
 
-    # Single leading system message (some providers reject more than one)
-    extras = ""
+    base_system = st.session_state.chat_history[0].content
+    voice_note = ""
     if speak_replies or hands_free:
-        extras += (
+        voice_note = (
             "\n\nThe user may hear your answer read aloud. Prefer natural, conversational prose; "
             "avoid tables, emojis, and long bulleted lists unless explicitly asked."
         )
-    if context_snippet:
-        extras += f"\n\nUse the following retrieved context if relevant:\n\n{context_snippet}"
+    history_only = st.session_state.chat_history[1:]
+    llm = init_groq_llm(model_choice, int(max_reply_tokens))
 
-    messages_to_send = list(st.session_state.chat_history)
-    if extras and isinstance(messages_to_send[0], SystemMessage):
-        messages_to_send = [SystemMessage(content=messages_to_send[0].content + extras)] + messages_to_send[1:]
-
+    # Try with full context first; if Groq says the request is too large (413),
+    # automatically retry with progressively less history / context.
+    attempts = [
+        (int(context_budget), context_snippet),
+        (max(int(context_budget) // 2, 1000), context_snippet[:1500]),
+        (900, ""),
+    ]
     response = None
+    last_error = None
+    used_context = False
     with st.chat_message("assistant"):
         with st.spinner("Thinking..."):
-            try:
-                response = invoke_with_rate_limit_retry(llm, messages_to_send)
-            except Exception as e:
-                if is_rate_limit_error(e):
+            for i, (budget, ctx) in enumerate(attempts):
+                system_text = base_system + voice_note
+                if ctx:
+                    system_text += f"\n\nUse the following retrieved context if relevant:\n\n{ctx[:3500]}"
+                messages_to_send = trim_messages(system_text, history_only, budget)
+                try:
+                    response = invoke_with_rate_limit_retry(llm, messages_to_send)
+                    used_context = bool(ctx)
+                    break
+                except Exception as e:
+                    last_error = e
+                    if is_too_large_error(e) and i < len(attempts) - 1:
+                        st.toast("Request too large for Groq's limit — retrying with less context…")
+                        continue
+                    break
+            if response is None and last_error is not None:
+                if is_too_large_error(last_error):
+                    st.error(
+                        "Even the trimmed request is too large for this model's per-minute token limit. "
+                        "Lower the sliders in 🧠 Model, pick another Groq model, or upgrade your Groq tier."
+                    )
+                elif is_rate_limit_error(last_error):
                     st.error(
                         "Groq rate limit or quota reached and retries were exhausted. "
-                        "Wait a bit, or check usage at console.groq.com."
+                        "Wait a minute, or check usage at console.groq.com."
                     )
                 else:
-                    st.error(f"The model call failed: {e}")
+                    st.error(f"The model call failed: {last_error}")
+            if not used_context:
+                retrieved_docs = []
 
         if response is not None:
             response_text = extract_response_text(response.content).strip() or "(The model returned an empty reply.)"
             st.markdown(response_text)
-            st.caption(f"Answered by Groq · {groq_model_name}")
+            st.caption(f"Answered by Groq · {model_choice}")
             if retrieved_docs:
                 with st.expander(f"📚 Sources used from your documents ({len(retrieved_docs)})"):
                     for i, doc in enumerate(retrieved_docs, start=1):
