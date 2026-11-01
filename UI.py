@@ -9,10 +9,7 @@ import html as html_lib
 import streamlit as st
 import streamlit.components.v1 as components
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
-from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_groq import ChatGroq
-from langchain_openai import ChatOpenAI
-from langchain_mistralai import ChatMistralAI
 from langchain_community.embeddings import FastEmbedEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import Chroma
@@ -39,60 +36,16 @@ def _secret(name, default=None):
     return val or os.environ.get(name) or default
 
 
-# 2. Optimized & Cached LLM Initializers, with a 4-provider Fallback Chain
-#    (Gemini -> Groq -> OpenAI -> Mistral)
-@st.cache_resource
-def init_gemini_llm():
-    api_key = _secret("GOOGLE_API_KEY")
-    if not api_key:
-        return None
-    model_name = _secret("GEMINI_MODEL", "gemini-flash-latest")
-    return ChatGoogleGenerativeAI(model=model_name, google_api_key=api_key, max_retries=5, timeout=60)
-
-
+# 2. Cached Groq LLM initializer
 @st.cache_resource
 def init_groq_llm():
+    """Initializes and caches the Groq chat model (the only provider used)."""
     api_key = _secret("GROQ_API_KEY")
     if not api_key:
-        return None
-    model_name = _secret("GROQ_MODEL", "openai/gpt-oss-120b")
-    return ChatGroq(model=model_name, api_key=api_key, max_retries=5, timeout=60)
-
-
-@st.cache_resource
-def init_openai_llm():
-    api_key = _secret("OPENAI_API_KEY")
-    if not api_key:
-        return None
-    model_name = _secret("OPENAI_MODEL", "gpt-5-mini")
-    return ChatOpenAI(model=model_name, api_key=api_key, max_retries=5, timeout=60)
-
-
-@st.cache_resource
-def init_mistral_llm():
-    api_key = _secret("MISTRAL_API_KEY")
-    if not api_key:
-        return None
-    model_name = _secret("MISTRAL_MODEL", "mistral-small-latest")
-    return ChatMistralAI(model=model_name, api_key=api_key, max_retries=5, timeout=60)
-
-
-def get_llm_chain():
-    chain = [
-        ("Gemini", init_gemini_llm()),
-        ("Groq", init_groq_llm()),
-        ("OpenAI", init_openai_llm()),
-        ("Mistral", init_mistral_llm()),
-    ]
-    chain = [(name, model) for name, model in chain if model is not None]
-    if not chain:
-        st.error(
-            "No LLM is configured. Set at least one of GOOGLE_API_KEY (Gemini), "
-            "GROQ_API_KEY (Groq), OPENAI_API_KEY (OpenAI), or MISTRAL_API_KEY (Mistral) "
-            "in your environment variables or Streamlit secrets."
-        )
+        st.error("GROQ_API_KEY is not set. Add it to your environment variables or Streamlit secrets.")
         st.stop()
-    return chain
+    model_name = _secret("GROQ_MODEL", "openai/gpt-oss-120b")
+    return ChatGroq(model=model_name, api_key=api_key, max_retries=5, timeout=60), model_name
 
 
 @st.cache_resource
@@ -101,7 +54,7 @@ def init_embeddings():
     return FastEmbedEmbeddings(model_name="BAAI/bge-small-en-v1.5")
 
 
-llm_chain = get_llm_chain()
+llm, groq_model_name = init_groq_llm()
 embeddings = init_embeddings()
 
 
@@ -205,21 +158,6 @@ def invoke_with_rate_limit_retry(llm, messages, max_attempts=4, base_delay=3):
     raise last_error
 
 
-def invoke_with_fallback(chain, messages, max_attempts=4, base_delay=3):
-    """Tries each provider in order. Returns (response, provider_name)."""
-    last_error = None
-    for i, (name, model) in enumerate(chain):
-        try:
-            result = invoke_with_rate_limit_retry(model, messages, max_attempts=max_attempts, base_delay=base_delay)
-            if i > 0:
-                st.toast(f"Switched to {name} after the earlier provider failed.")
-            return result, name
-        except Exception as e:
-            last_error = e
-            continue
-    raise last_error
-
-
 # ---------------------------------------------------------------------------
 # VOICE: speech-to-text (server-side Whisper) + text cleanup for speech
 # ---------------------------------------------------------------------------
@@ -244,48 +182,20 @@ VOICE_LANGS = {
 
 
 def transcribe_audio(audio_bytes, lang_code):
-    """Transcribes recorded audio with Whisper (Groq first, then OpenAI).
-       Returns (text, error_message)."""
+    """Transcribes recorded audio with Groq's Whisper. Returns (text, error_message)."""
     lang = lang_code.split("-")[0]
-    errors = []
-
-    groq_key = _secret("GROQ_API_KEY")
-    if groq_key:
-        try:
-            from groq import Groq
-            client = Groq(api_key=groq_key)
-            r = client.audio.transcriptions.create(
-                file=("voice.wav", audio_bytes),
-                model=_secret("GROQ_STT_MODEL", "whisper-large-v3-turbo"),
-                language=lang,
-            )
-            text = (getattr(r, "text", None) or "").strip()
-            if text:
-                return text, None
-            errors.append("Groq returned an empty transcript.")
-        except Exception as e:
-            errors.append(f"Groq: {e}")
-
-    openai_key = _secret("OPENAI_API_KEY")
-    if openai_key:
-        try:
-            from openai import OpenAI
-            client = OpenAI(api_key=openai_key)
-            r = client.audio.transcriptions.create(
-                model=_secret("OPENAI_STT_MODEL", "whisper-1"),
-                file=("voice.wav", audio_bytes),
-                language=lang,
-            )
-            text = (getattr(r, "text", None) or "").strip()
-            if text:
-                return text, None
-            errors.append("OpenAI returned an empty transcript.")
-        except Exception as e:
-            errors.append(f"OpenAI: {e}")
-
-    if not errors:
-        errors.append("Audio transcription needs GROQ_API_KEY or OPENAI_API_KEY.")
-    return None, " | ".join(errors)
+    try:
+        from groq import Groq
+        client = Groq(api_key=_secret("GROQ_API_KEY"))
+        r = client.audio.transcriptions.create(
+            file=("voice.wav", audio_bytes),
+            model=_secret("GROQ_STT_MODEL", "whisper-large-v3-turbo"),
+            language=lang,
+        )
+        text = (getattr(r, "text", None) or "").strip()
+        return (text, None) if text else (None, "Groq returned an empty transcript.")
+    except Exception as e:
+        return None, str(e)
 
 
 def clean_for_speech(text):
@@ -887,22 +797,10 @@ with st.sidebar:
         else:
             st.caption("Update Streamlit (>= 1.39) to enable in-app audio recording.")
 
-    # ---- Model engine ----
+    # ---- Model ----
     st.markdown("---")
-    st.subheader("🧠 Model Engine")
-    provider_names = [name for name, _ in llm_chain]
-    engine_options = ["Auto (fallback chain)"] + provider_names
-    engine_choice = st.selectbox(
-        "Choose which AI answers you:",
-        engine_options,
-        help=(
-            "Auto tries each configured provider in order (Gemini → Groq → OpenAI → "
-            "Mistral) and falls back automatically if one hits a rate limit or error. "
-            "Picking a specific provider tries that one first, still falling back to "
-            "the others if it fails."
-        ),
-    )
-    st.caption(f"Configured providers: {', '.join(provider_names) if provider_names else 'none'}")
+    st.subheader("🧠 Model")
+    st.caption(f"Powered by Groq · `{groq_model_name}`")
 
     # ---- RAG ----
     st.markdown("---")
@@ -915,14 +813,6 @@ with st.sidebar:
     if st.button("🗑️ Reset Knowledge Base"):
         build_vector_store.clear()
         st.rerun()
-
-# Reorder the fallback chain so the sidebar's chosen engine goes first
-if engine_choice != "Auto (fallback chain)":
-    active_llm_chain = [p for p in llm_chain if p[0] == engine_choice] + \
-                       [p for p in llm_chain if p[0] != engine_choice]
-else:
-    active_llm_chain = llm_chain
-
 
 # 5. Core Application Initialization (Session Memory Management)
 def build_system_prompt(persona, desc):
@@ -1044,18 +934,15 @@ if user_prompt:
         messages_to_send = [SystemMessage(content=messages_to_send[0].content + extras)] + messages_to_send[1:]
 
     response = None
-    used_provider = None
     with st.chat_message("assistant"):
         with st.spinner("Thinking..."):
             try:
-                response, used_provider = invoke_with_fallback(active_llm_chain, messages_to_send)
+                response = invoke_with_rate_limit_retry(llm, messages_to_send)
             except Exception as e:
                 if is_rate_limit_error(e):
                     st.error(
-                        "All configured providers hit their rate limit or quota, and retries were "
-                        "exhausted. Wait a bit before trying again, or check usage at "
-                        "aistudio.google.com (Gemini) / console.groq.com (Groq) / "
-                        "platform.openai.com (OpenAI) / console.mistral.ai (Mistral)."
+                        "Groq rate limit or quota reached and retries were exhausted. "
+                        "Wait a bit, or check usage at console.groq.com."
                     )
                 else:
                     st.error(f"The model call failed: {e}")
@@ -1063,7 +950,7 @@ if user_prompt:
         if response is not None:
             response_text = extract_response_text(response.content).strip() or "(The model returned an empty reply.)"
             st.markdown(response_text)
-            st.caption(f"Answered by {used_provider}")
+            st.caption(f"Answered by Groq · {groq_model_name}")
             if retrieved_docs:
                 with st.expander(f"📚 Sources used from your documents ({len(retrieved_docs)})"):
                     for i, doc in enumerate(retrieved_docs, start=1):
